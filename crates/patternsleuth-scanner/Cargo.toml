@@ -1,0 +1,12 @@
+[package]
+name = "patternsleuth_scanner"
+repository = "https://github.com/trumank/patternsleuth"
+authors = ["trumank"]
+license = "MIT OR Apache-2.0"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+rayon = { workspace = true }
+memchr = { workspace = true }
+anyhow = { workspace = true }

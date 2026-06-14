@@ -1,0 +1,11 @@
+[package]
+name = "ue4ssl_native"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+camino.workspace = true

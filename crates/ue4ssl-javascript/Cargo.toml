@@ -1,0 +1,16 @@
+[package]
+name = "ue4ssl-javascript"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ue4ssl-javascript-support = { path = "../ue4ssl-javascript-support" }
+
+[build-dependencies]
+cc.workspace = true
+ue4ssl_abi.workspace = true

@@ -1,0 +1,13 @@
+[package]
+name = "ue4ssl-lua-support"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[build-dependencies]
+cc.workspace = true

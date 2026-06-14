@@ -1,0 +1,73 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/xtask",
+    "crates/ue4ssl-abi",
+    "crates/ue4ssl-native",
+    "crates/ue4ssl-native-support",
+    "crates/ue4ssl-unreal-support",
+    "crates/ue4ssl-cpp-support",
+    "crates/ue4ssl-javascript-support",
+    "crates/ue4ssl-lua-support",
+    "crates/ue4ssl-host",
+    "crates/ue4ssl-dll",
+    "crates/ue4ssl-javascript",
+    "crates/ue4ssl-lua",
+    "crates/ue4ssl-proxy",
+    "crates/ue4ssl-core",
+    "crates/patternsleuth",
+    "crates/patternsleuth-scanner",
+    "crates/patternsleuth-bind",
+    "crates/ue4ss-hook-rs",
+    "Mods/UE4SSL.DRG/native",
+    "Mods/DRGMod.AudioReplace/native",
+    "Mods/UE4SSL.MintCat/native",
+    "Mods/RogueCore.RepeatNegotiationCards.Native/native",
+]
+default-members = [
+    "crates/ue4ssl-dll",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1.0.95"
+camino = "1.1.9"
+cc = { version = "1.2.7", features = ["parallel"] }
+clap = { version = "4.5.23", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+xshell = "0.2.7"
+iced-x86 = "1.20.0"
+itertools = "0.12.0"
+memchr = "2.7.1"
+msvc-demangler = "0.9.0"
+object = "0.32.2"
+pdb = "0.8.0"
+rayon = "1.8.0"
+strum = { version = "0.25.0", features = ["strum_macros", "derive"] }
+windows = "0.52.0"
+
+ue4ssl_abi = { path = "crates/ue4ssl-abi" }
+ue4ssl_native = { path = "crates/ue4ssl-native" }
+ue4ssl_host = { path = "crates/ue4ssl-host" }
+ue4ssl_core = { path = "crates/ue4ssl-core" }
+ue4ssl-unreal-support = { path = "crates/ue4ssl-unreal-support" }
+ue4ssl-cpp-support = { path = "crates/ue4ssl-cpp-support" }
+ue4ss_hook_rs = { path = "crates/ue4ss-hook-rs" }
+patternsleuth = { path = "crates/patternsleuth", features = ["process-internal", "image-pe"] }
+patternsleuth_scanner = { path = "crates/patternsleuth-scanner" }
+patternsleuth_bind = { path = "crates/patternsleuth-bind" }
+
+[profile.dev]
+debug = true
+incremental = true
+
+[profile.release]
+debug = true
+incremental = true
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,8 @@
+[package]
+name = "ue4ssl_core"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ue4ssl_abi.workspace = true

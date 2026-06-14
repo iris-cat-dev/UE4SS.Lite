@@ -1,0 +1,25 @@
+# Force the windows-rs / windows-targets crate family to use raw-dylib imports
+# instead of linking against the versioned, pre-built `windows.<ver>.lib` files
+# shipped inside the cargo registry (e.g. windows_x86_64_msvc-0.48.5/lib/windows.0.48.5.lib).
+#
+# Without this, downstream native links can pick up versioned import-lib names
+# from the cargo registry instead of using raw-dylib imports, which leads to
+# fragile linker search-path behavior on Windows/MSVC.
+#
+# This file MUST live at the project root: cargo discovers .cargo/config.toml by
+# walking upward from the cargo process's current working directory, not from
+# the manifest path.
+
+[target.'cfg(windows)']
+rustflags = ["--cfg", "windows_raw_dylib"]
+
+[alias]
+xtask = "run -p xtask --"
+ue4ssl-build = "xtask build"
+ue4ssl-build-native-support = "xtask build-native-support"
+ue4ssl-build-proxy = "xtask build-proxy"
+ue4ssl-package = "xtask package"
+ue4ssl-package-proxy = "xtask package-proxy"
+ue4ssl-install = "xtask install"
+ue4ssl-install-proxy = "xtask install-proxy"
+ue4ssl-sync-abi = "xtask sync-abi"

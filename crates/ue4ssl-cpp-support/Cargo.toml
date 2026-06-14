@@ -1,0 +1,15 @@
+[package]
+name = "ue4ssl-cpp-support"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+build = "build.rs"
+links = "ue4ssl_cpp_support"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[build-dependencies]
+cc.workspace = true
+ue4ssl_abi.workspace = true
