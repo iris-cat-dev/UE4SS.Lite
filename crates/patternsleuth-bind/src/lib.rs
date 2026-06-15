@@ -180,7 +180,7 @@ pub extern "C" fn ps_scan(ctx: &PsCtx, results: &mut PsScanResults) -> bool {
 
 #[inline(never)]
 pub fn force_link_exports() {
-    ue4ss_hook_rs::force_link_exports();
+    ue4ssl_hook::force_link_exports();
     #[cfg(not(test))]
     ue4ssl_core::force_link_exports();
     ue4ssl_host::force_link_exports();

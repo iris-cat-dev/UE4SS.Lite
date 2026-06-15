@@ -18,11 +18,7 @@ members = [
     "crates/patternsleuth",
     "crates/patternsleuth-scanner",
     "crates/patternsleuth-bind",
-    "crates/ue4ss-hook-rs",
-    "Mods/UE4SSL.DRG/native",
-    "Mods/DRGMod.AudioReplace/native",
-    "Mods/UE4SSL.MintCat/native",
-    "Mods/RogueCore.RepeatNegotiationCards.Native/native",
+    "crates/ue4ssl-hook",
 ]
 default-members = [
     "crates/ue4ssl-dll",
@@ -57,7 +53,7 @@ ue4ssl_host = { path = "crates/ue4ssl-host" }
 ue4ssl_core = { path = "crates/ue4ssl-core" }
 ue4ssl-unreal-support = { path = "crates/ue4ssl-unreal-support" }
 ue4ssl-cpp-support = { path = "crates/ue4ssl-cpp-support" }
-ue4ss_hook_rs = { path = "crates/ue4ss-hook-rs" }
+ue4ssl-hook = { path = "crates/ue4ssl-hook" }
 patternsleuth = { path = "crates/patternsleuth", features = ["process-internal", "image-pe"] }
 patternsleuth_scanner = { path = "crates/patternsleuth-scanner" }
 patternsleuth_bind = { path = "crates/patternsleuth-bind" }

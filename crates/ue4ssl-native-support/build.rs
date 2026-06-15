@@ -36,7 +36,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/String/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 
     require_paths_exist("ue4ssl-native-support sources", sources.iter());
@@ -51,7 +51,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/String/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 
     for dir in tracked_dirs {

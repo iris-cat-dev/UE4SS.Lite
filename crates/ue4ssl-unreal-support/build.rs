@@ -40,7 +40,7 @@ fn main() {
             workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
             workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
             workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
-            workspace_root.join("crates/ue4ss-hook-rs/include"),
+            workspace_root.join("crates/ue4ssl-hook/include"),
         ],
     );
 
@@ -51,7 +51,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);
     }

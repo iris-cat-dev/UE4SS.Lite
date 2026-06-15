@@ -22,7 +22,7 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 - `crates/ue4ssl-native-support`: shared native support libraries such as Input, DynamicOutput, Helpers, String, and SinglePassSigScanner.
 - `crates/ue4ssl-unreal-support`: vendored Unreal, Constructs, Function, and MProgram sources; builds `ue4ssl_unreal_cpp.lib`.
 - `crates/ue4ssl-cpp-support`: vendored UE4SSL C++ boundary sources; builds `ue4ssl_core_cpp.lib`.
-- `crates/ue4ss-hook-rs`: Rust implementation of UE4SSHook plus C++ compatibility headers.
+- `crates/ue4ssl-hook`: Rust implementation of UE4SSHook plus C++ compatibility headers.
 - `crates/ue4ssl-javascript*` and `crates/ue4ssl-lua*`: script engine runtimes and VM support crates.
 - `Mods/*/native`: native mods that are part of the Cargo workspace.
 - `crates/xtask`: build, package, install, proxy, and ABI synchronization commands.
@@ -62,6 +62,23 @@ cargo check -p ue4ssl-dll
 cargo build -p ue4ssl-dll
 ```
 
+Cross-compile the core Windows DLL from macOS:
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --core-only
+```
+
+Cross-compile the core DLL plus Lua/JavaScript script engine DLLs from macOS:
+
+```sh
+cargo ue4ssl-build --target x86_64-pc-windows-msvc
+```
+
+The cross-compile path keeps the Windows/MSVC ABI and produces Windows DLLs for validation on a Windows game install. Configure a Windows SDK/MSVC CRT provider such as `cargo-xwin`/`xwin`, or provide equivalent `clang-cl`, `lld-link`, `llvm-lib`, Windows SDK, UCRT, and MSVC CRT paths in the environment.
+
+For the first cross-compile phase, keep Unreal-facing C++ ABI, hook trampolines, and code that depends on C++ class layout in C++. Good candidates for later Rust migration are build glue, artifact/path handling, small Win32 FFI helpers, and metadata plumbing that does not participate in Unreal C++ ABI boundaries.
+
 ## Packaging and Install
 
 Create a staged UE4SS layout:
@@ -75,6 +92,12 @@ Package output is written to:
 
 ```text
 target/package/<debug|release>/ue4ss/
+```
+
+When `--target` is provided, package output is written to:
+
+```text
+target/package/<target-triple>/<debug|release>/ue4ss/
 ```
 
 Install into a game directory:

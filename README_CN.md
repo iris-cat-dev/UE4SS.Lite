@@ -22,7 +22,7 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 - `crates/ue4ssl-native-support`：Input、DynamicOutput、Helpers、String、SinglePassSigScanner 等共享 native 支撑库。
 - `crates/ue4ssl-unreal-support`：vendored Unreal、Constructs、Function、MProgram 源码；构建 `ue4ssl_unreal_cpp.lib`。
 - `crates/ue4ssl-cpp-support`：vendored UE4SSL C++ 边界源码；构建 `ue4ssl_core_cpp.lib`。
-- `crates/ue4ss-hook-rs`：UE4SSHook 的 Rust 实现和 C++ 兼容头。
+- `crates/ue4ssl-hook`：UE4SSHook 的 Rust 实现和 C++ 兼容头。
 - `crates/ue4ssl-javascript*` 与 `crates/ue4ssl-lua*`：脚本引擎运行时和 VM support crate。
 - `Mods/*/native`：纳入 Cargo workspace 的原生 Mod。
 - `crates/xtask`：build、package、install、proxy 和 ABI 同步命令。
@@ -62,6 +62,23 @@ cargo check -p ue4ssl-dll
 cargo build -p ue4ssl-dll
 ```
 
+在 macOS 上交叉编译核心 Windows DLL：
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --core-only
+```
+
+在 macOS 上交叉编译核心 DLL 和 Lua/JavaScript 脚本引擎 DLL：
+
+```sh
+cargo ue4ssl-build --target x86_64-pc-windows-msvc
+```
+
+这条交叉编译路线保留 Windows/MSVC ABI，产物仍是用于 Windows 游戏环境验证的 DLL。需要配置 Windows SDK/MSVC CRT 来源，例如 `cargo-xwin`/`xwin`，或在环境中提供等价的 `clang-cl`、`lld-link`、`llvm-lib`、Windows SDK、UCRT 和 MSVC CRT 路径。
+
+第一阶段先保留 Unreal C++ ABI 边界、Hook trampoline、依赖 C++ 类布局和调用约定的代码。后续更适合迁移到 Rust 的部分是构建 glue、产物/路径处理、简单 Win32 FFI helper，以及不参与 Unreal C++ ABI 的元数据逻辑。
+
 ## 打包与安装
 
 生成可安装的 UE4SS 布局：
@@ -75,6 +92,12 @@ cargo ue4ssl-package --profile release
 
 ```text
 target/package/<debug|release>/ue4ss/
+```
+
+如果传入 `--target`，打包输出目录为：
+
+```text
+target/package/<target-triple>/<debug|release>/ue4ss/
 ```
 
 安装到游戏目录：

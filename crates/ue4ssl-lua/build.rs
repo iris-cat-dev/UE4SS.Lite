@@ -46,7 +46,7 @@ fn main() {
             "crates/ue4ssl-unreal-support/vendor/Constructs/include",
             "crates/ue4ssl-unreal-support/vendor/MProgram/include",
             "crates/ue4ssl-unreal-support/vendor/Function/include",
-            "crates/ue4ss-hook-rs/include",
+            "crates/ue4ssl-hook/include",
         ],
     );
     require_paths_exist("ue4ssl-lua sources", lua_sources(&workspace_root));
@@ -69,7 +69,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);
     }
@@ -127,7 +127,7 @@ fn compile_lua_archive(
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         build.include(include);
     }

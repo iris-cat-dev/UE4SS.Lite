@@ -1,5 +1,5 @@
 [package]
-name = "ue4ss_hook_rs"
+name = "ue4ssl-hook"
 edition.workspace = true
 version.workspace = true
 publish.workspace = true

@@ -87,10 +87,10 @@ namespace RC
                 return *this;
             }
 
-            auto operator++(int) -> iterator&
+            auto operator++(int) -> iterator
             {
                 iterator temp = *this;
-                *++this;
+                ++(*this);
                 return temp;
             }
 
@@ -119,7 +119,7 @@ namespace RC
             other.handle = {};
         }
 
-        Generator& operator=(const Generator&& other) noexcept
+        Generator& operator=(Generator&& other) noexcept
         {
             if (this != &other)
             {

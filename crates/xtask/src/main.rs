@@ -1,12 +1,12 @@
-use std::fs;
+use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use ue4ssl_native::{
     artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, core_artifacts,
-    default_artifacts, package_stage_dir, runtime_artifacts, ArtifactSpec, CargoProfile,
-    PackageKind,
+    default_artifacts, package_profile_dir, package_stage_dir, runtime_artifacts, ArtifactSpec,
+    CargoProfile, PackageKind,
 };
 use xshell::{cmd, Shell};
 
@@ -22,14 +22,22 @@ enum Command {
     Build {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        core_only: bool,
     },
     BuildNativeSupport {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
+        #[arg(long)]
+        target: Option<String>,
     },
     BuildProxy {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
+        #[arg(long)]
+        target: Option<String>,
         #[arg(long)]
         proxy_path: Option<Utf8PathBuf>,
     },
@@ -37,11 +45,17 @@ enum Command {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
         #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        core_only: bool,
+        #[arg(long)]
         no_build: bool,
     },
     PackageProxy {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
+        #[arg(long)]
+        target: Option<String>,
         #[arg(long)]
         no_build: bool,
         #[arg(long)]
@@ -51,6 +65,10 @@ enum Command {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
         #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        core_only: bool,
+        #[arg(long)]
         no_build: bool,
         #[arg(long)]
         destination: Utf8PathBuf,
@@ -58,6 +76,8 @@ enum Command {
     InstallProxy {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
         profile: ProfileArg,
+        #[arg(long)]
+        target: Option<String>,
         #[arg(long)]
         no_build: bool,
         #[arg(long)]
@@ -86,35 +106,63 @@ impl From<ProfileArg> for CargoProfile {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Build { profile } => build(profile.into()),
-        Command::BuildNativeSupport { profile } => build_native_support(profile.into()),
+        Command::Build {
+            profile,
+            target,
+            core_only,
+        } => build(profile.into(), target.as_deref(), core_only),
+        Command::BuildNativeSupport { profile, target } => {
+            build_native_support(profile.into(), target.as_deref())
+        }
         Command::BuildProxy {
             profile,
+            target,
             proxy_path,
-        } => build_proxy(profile.into(), proxy_path),
-        Command::Package { profile, no_build } => {
-            package(profile.into(), no_build)?;
+        } => build_proxy(profile.into(), target.as_deref(), proxy_path),
+        Command::Package {
+            profile,
+            target,
+            core_only,
+            no_build,
+        } => {
+            package(profile.into(), target.as_deref(), no_build, core_only)?;
             Ok(())
         }
         Command::PackageProxy {
             profile,
+            target,
             no_build,
             proxy_path,
         } => {
-            package_proxy(profile.into(), no_build, proxy_path)?;
+            package_proxy(profile.into(), target.as_deref(), no_build, proxy_path)?;
             Ok(())
         }
         Command::Install {
             profile,
+            target,
+            core_only,
             no_build,
             destination,
-        } => install(profile.into(), no_build, destination),
+        } => install(
+            profile.into(),
+            target.as_deref(),
+            no_build,
+            core_only,
+            destination,
+        ),
         Command::InstallProxy {
             profile,
+            target,
             no_build,
             proxy_path,
             destination,
-        } => install_proxy(profile.into(), no_build, proxy_path, destination),
+        } => install_proxy(
+            profile.into(),
+            target.as_deref(),
+            no_build,
+            proxy_path,
+            destination,
+        ),
         Command::SyncAbi => sync_abi(),
     }
 }
@@ -157,15 +205,23 @@ fn sync_abi() -> Result<()> {
     Ok(())
 }
 
-fn build(profile: CargoProfile) -> Result<()> {
+fn build(profile: CargoProfile, target: Option<&str>, core_only: bool) -> Result<()> {
     sync_abi()?;
 
     let root = workspace_root()?;
     let shell = Shell::new()?;
-    shell.change_dir(root.as_str());
+    prepare_cargo_shell(&shell, &root);
 
-    build_artifacts(&shell, profile, core_artifacts(), "core artifacts")?;
-    build_artifacts(&shell, profile, runtime_artifacts(), "runtime artifacts")?;
+    build_artifacts(&shell, profile, target, core_artifacts(), "core artifacts")?;
+    if !core_only {
+        build_artifacts(
+            &shell,
+            profile,
+            target,
+            runtime_artifacts(),
+            "runtime artifacts",
+        )?;
+    }
 
     Ok(())
 }
@@ -173,6 +229,7 @@ fn build(profile: CargoProfile) -> Result<()> {
 fn build_artifacts(
     shell: &Shell,
     profile: CargoProfile,
+    target: Option<&str>,
     artifacts: impl IntoIterator<Item = &'static ArtifactSpec>,
     label: &str,
 ) -> Result<()> {
@@ -186,22 +243,13 @@ fn build_artifacts(
         return Ok(());
     }
 
-    match profile {
-        CargoProfile::Dev => cmd!(shell, "cargo build {package_args...}")
-            .run()
-            .with_context(|| format!("cargo build failed for {label}"))?,
-        CargoProfile::Release => cmd!(shell, "cargo build --release {package_args...}")
-            .run()
-            .with_context(|| format!("cargo release build failed for {label}"))?,
-    }
-
-    Ok(())
+    run_cargo_build(shell, profile, target, &package_args, label)
 }
 
-fn build_native_support(profile: CargoProfile) -> Result<()> {
+fn build_native_support(profile: CargoProfile, target: Option<&str>) -> Result<()> {
     let root = workspace_root()?;
     let shell = Shell::new()?;
-    shell.change_dir(root.as_str());
+    prepare_cargo_shell(&shell, &root);
     let package_args = [
         "-p",
         "ue4ssl-native-support",
@@ -211,65 +259,70 @@ fn build_native_support(profile: CargoProfile) -> Result<()> {
         "ue4ssl-cpp-support",
     ];
 
-    match profile {
-        CargoProfile::Dev => cmd!(shell, "cargo build {package_args...}")
-            .run()
-            .context("cargo build failed for native support crates")?,
-        CargoProfile::Release => cmd!(shell, "cargo build --release {package_args...}")
-            .run()
-            .context("cargo release build failed for native support crates")?,
-    }
-
-    Ok(())
+    let package_args = package_args
+        .iter()
+        .map(|value| value.to_string())
+        .collect::<Vec<_>>();
+    run_cargo_build(
+        &shell,
+        profile,
+        target,
+        &package_args,
+        "native support crates",
+    )
 }
 
-fn build_proxy(profile: CargoProfile, proxy_path: Option<Utf8PathBuf>) -> Result<()> {
+fn build_proxy(
+    profile: CargoProfile,
+    target: Option<&str>,
+    proxy_path: Option<Utf8PathBuf>,
+) -> Result<()> {
     let root = workspace_root()?;
     let shell = Shell::new()?;
-    shell.change_dir(root.as_str());
+    prepare_cargo_shell(&shell, &root);
 
     if let Some(proxy_path) = proxy_path {
         shell.set_var("UE4SSL_PROXY_PATH", proxy_path.as_str());
     }
 
-    match profile {
-        CargoProfile::Dev => cmd!(shell, "cargo build -p ue4ssl-proxy")
-            .run()
-            .context("cargo build failed for ue4ssl-proxy")?,
-        CargoProfile::Release => cmd!(shell, "cargo build --release -p ue4ssl-proxy")
-            .run()
-            .context("cargo release build failed for ue4ssl-proxy")?,
-    }
-
-    Ok(())
+    let package_args = vec!["-p".to_owned(), "ue4ssl-proxy".to_owned()];
+    run_cargo_build(&shell, profile, target, &package_args, "ue4ssl-proxy")
 }
 
-fn package(profile: CargoProfile, no_build: bool) -> Result<()> {
-    package_to_stage(profile, no_build).map(|_| ())
+fn package(
+    profile: CargoProfile,
+    target: Option<&str>,
+    no_build: bool,
+    core_only: bool,
+) -> Result<()> {
+    package_to_stage(profile, target, no_build, core_only).map(|_| ())
 }
 
-fn install(profile: CargoProfile, no_build: bool, destination: Utf8PathBuf) -> Result<()> {
-    let stage_dir = package_to_stage(profile, no_build)?;
+fn install(
+    profile: CargoProfile,
+    target: Option<&str>,
+    no_build: bool,
+    core_only: bool,
+    destination: Utf8PathBuf,
+) -> Result<()> {
+    let stage_dir = package_to_stage(profile, target, no_build, core_only)?;
     copy_tree(&stage_dir, &destination)?;
     Ok(())
 }
 
 fn package_proxy(
     profile: CargoProfile,
+    target: Option<&str>,
     no_build: bool,
     proxy_path: Option<Utf8PathBuf>,
 ) -> Result<Utf8PathBuf> {
     let proxy_path = proxy_path.unwrap_or_else(default_proxy_path);
     if !no_build {
-        build_proxy(profile, Some(proxy_path.clone()))?;
+        build_proxy(profile, target, Some(proxy_path.clone()))?;
     }
 
     let root = workspace_root()?;
-    let stage_dir = root
-        .join("target")
-        .join("package")
-        .join(profile.cargo_dir())
-        .join("proxy");
+    let stage_dir = package_profile_dir(&root, profile, target).join("proxy");
     if stage_dir.exists() {
         fs::remove_dir_all(stage_dir.as_std_path()).with_context(|| {
             format!("failed to remove existing proxy package dir {}", stage_dir)
@@ -281,19 +334,13 @@ fn package_proxy(
     let proxy_stem = proxy_path
         .file_stem()
         .context("proxy path is missing file stem")?;
-    let built_binary = root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join("ue4ssl_proxy.dll");
+    let built_binary = artifact_binary_path(&root, profile, target, "ue4ssl_proxy");
     if !built_binary.exists() {
         bail!("expected built proxy artifact at {}", built_binary);
     }
     copy_file(&built_binary, &stage_dir.join(format!("{proxy_stem}.dll")))?;
 
-    let built_import_lib = root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join("ue4ssl_proxy.dll.lib");
+    let built_import_lib = artifact_import_lib_path(&root, profile, target, "ue4ssl_proxy");
     if built_import_lib.exists() {
         copy_file(
             &built_import_lib,
@@ -301,10 +348,7 @@ fn package_proxy(
         )?;
     }
 
-    let built_pdb = root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join("ue4ssl_proxy.pdb");
+    let built_pdb = artifact_pdb_path(&root, profile, target, "ue4ssl_proxy");
     if built_pdb.exists() {
         copy_file(&built_pdb, &stage_dir.join(format!("{proxy_stem}.pdb")))?;
     }
@@ -314,22 +358,28 @@ fn package_proxy(
 
 fn install_proxy(
     profile: CargoProfile,
+    target: Option<&str>,
     no_build: bool,
     proxy_path: Option<Utf8PathBuf>,
     destination: Utf8PathBuf,
 ) -> Result<()> {
-    let stage_dir = package_proxy(profile, no_build, proxy_path)?;
+    let stage_dir = package_proxy(profile, target, no_build, proxy_path)?;
     copy_tree(&stage_dir, &destination)?;
     Ok(())
 }
 
-fn package_to_stage(profile: CargoProfile, no_build: bool) -> Result<Utf8PathBuf> {
+fn package_to_stage(
+    profile: CargoProfile,
+    target: Option<&str>,
+    no_build: bool,
+    core_only: bool,
+) -> Result<Utf8PathBuf> {
     if !no_build {
-        build(profile)?;
+        build(profile, target, core_only)?;
     }
 
     let root = workspace_root()?;
-    let stage_dir = package_stage_dir(&root, profile);
+    let stage_dir = package_stage_dir(&root, profile, target);
     if stage_dir.exists() {
         fs::remove_dir_all(stage_dir.as_std_path())
             .with_context(|| format!("failed to remove existing package dir {}", stage_dir))?;
@@ -337,8 +387,8 @@ fn package_to_stage(profile: CargoProfile, no_build: bool) -> Result<Utf8PathBuf
     fs::create_dir_all(stage_dir.as_std_path())
         .with_context(|| format!("failed to create package dir {}", stage_dir))?;
 
-    for artifact in default_artifacts() {
-        stage_artifact(&root, &stage_dir, profile, artifact)?;
+    for artifact in selected_artifacts(core_only) {
+        stage_artifact(&root, &stage_dir, profile, target, artifact)?;
     }
 
     Ok(stage_dir)
@@ -348,9 +398,10 @@ fn stage_artifact(
     root: &Utf8Path,
     stage_dir: &Utf8Path,
     profile: CargoProfile,
+    target: Option<&str>,
     artifact: &ArtifactSpec,
 ) -> Result<()> {
-    let cargo_binary = artifact_binary_path(root, profile, artifact.cargo_target_stem);
+    let cargo_binary = artifact_binary_path(root, profile, target, artifact.cargo_target_stem);
     if !cargo_binary.exists() {
         bail!("expected built artifact at {}", cargo_binary);
     }
@@ -362,7 +413,7 @@ fn stage_artifact(
                 &stage_dir.join(format!("{}.dll", artifact.binary_name)),
             )?;
 
-            let import_lib = artifact_import_lib_path(root, profile, artifact.binary_name);
+            let import_lib = artifact_import_lib_path(root, profile, target, artifact.binary_name);
             if import_lib.exists() {
                 copy_file(
                     &import_lib,
@@ -370,7 +421,7 @@ fn stage_artifact(
                 )?;
             }
 
-            let pdb = artifact_pdb_path(root, profile, artifact.cargo_target_stem);
+            let pdb = artifact_pdb_path(root, profile, target, artifact.cargo_target_stem);
             if pdb.exists() {
                 copy_file(
                     &pdb,
@@ -385,7 +436,7 @@ fn stage_artifact(
             let mod_dir = stage_dir.join("mods").join(mod_name);
             copy_file(&cargo_binary, &mod_dir.join("main.dll"))?;
 
-            let pdb = artifact_pdb_path(root, profile, artifact.cargo_target_stem);
+            let pdb = artifact_pdb_path(root, profile, target, artifact.cargo_target_stem);
             if pdb.exists() {
                 copy_file(&pdb, &mod_dir.join("main.pdb"))?;
             }
@@ -405,6 +456,89 @@ fn stage_artifact(
     }
 
     Ok(())
+}
+
+fn selected_artifacts(core_only: bool) -> Vec<&'static ArtifactSpec> {
+    if core_only {
+        core_artifacts().collect()
+    } else {
+        default_artifacts().collect()
+    }
+}
+
+fn prepare_cargo_shell(shell: &Shell, root: &Utf8Path) {
+    shell.change_dir(root.as_str());
+    shell.set_var("CARGO_TARGET_DIR", root.join("target").as_str());
+}
+
+fn run_cargo_build(
+    shell: &Shell,
+    profile: CargoProfile,
+    target: Option<&str>,
+    package_args: &[String],
+    label: &str,
+) -> Result<()> {
+    let target_args = cargo_target_args(target);
+    if use_cargo_xwin(target) {
+        ensure_cargo_xwin_available()?;
+        match profile {
+            CargoProfile::Dev => cmd!(shell, "cargo xwin build {target_args...} {package_args...}")
+                .run()
+                .with_context(|| format!("cargo xwin build failed for {label}"))?,
+            CargoProfile::Release => cmd!(
+                shell,
+                "cargo xwin build --release {target_args...} {package_args...}"
+            )
+            .run()
+            .with_context(|| format!("cargo xwin release build failed for {label}"))?,
+        }
+    } else {
+        match profile {
+            CargoProfile::Dev => cmd!(shell, "cargo build {target_args...} {package_args...}")
+                .run()
+                .with_context(|| format!("cargo build failed for {label}"))?,
+            CargoProfile::Release => cmd!(
+                shell,
+                "cargo build --release {target_args...} {package_args...}"
+            )
+            .run()
+            .with_context(|| format!("cargo release build failed for {label}"))?,
+        }
+    }
+
+    Ok(())
+}
+
+fn cargo_target_args(target: Option<&str>) -> Vec<String> {
+    match target.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(target) => vec!["--target".to_owned(), target.to_owned()],
+        None => Vec::new(),
+    }
+}
+
+fn use_cargo_xwin(target: Option<&str>) -> bool {
+    !cfg!(windows)
+        && target
+            .map(str::trim)
+            .is_some_and(|target| target == "x86_64-pc-windows-msvc")
+}
+
+fn ensure_cargo_xwin_available() -> Result<()> {
+    if executable_in_path("cargo-xwin") {
+        return Ok(());
+    }
+
+    bail!(
+        "cross-compiling x86_64-pc-windows-msvc from this host requires cargo-xwin. Install it with `cargo install cargo-xwin` or run the underlying cargo build with a manually configured MSVC-compatible toolchain."
+    )
+}
+
+fn executable_in_path(name: &str) -> bool {
+    let Some(path) = env::var_os("PATH") else {
+        return false;
+    };
+
+    env::split_paths(&path).any(|dir| dir.join(name).is_file())
 }
 
 fn stage_extra_root(root: &Utf8Path, mod_dir: &Utf8Path, extra_root: &str) -> Result<()> {

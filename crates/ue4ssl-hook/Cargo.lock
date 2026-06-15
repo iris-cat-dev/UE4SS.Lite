@@ -857,7 +857,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ue4ss_hook_rs"
+name = "ue4ssl-hook"
 version = "0.1.0"
 dependencies = [
  "patternsleuth",

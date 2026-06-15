@@ -18,6 +18,13 @@ impl CargoProfile {
     }
 }
 
+fn explicit_target(target: Option<&str>) -> Option<&str> {
+    target.and_then(|value| {
+        let value = value.trim();
+        (!value.is_empty()).then_some(value)
+    })
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 
 pub enum NativeStrategy {
@@ -93,7 +100,7 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
             "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
             "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
             "crates/ue4ssl-native-support/vendor/String/include",
-            "crates/ue4ss-hook-rs/include",
+            "crates/ue4ssl-hook/include",
         ],
     },
     NativeGroup {
@@ -318,10 +325,7 @@ pub fn artifact_by_package(package_name: &str) -> Option<&'static ArtifactSpec> 
 }
 
 pub fn default_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    CORE_ARTIFACTS
-        .iter()
-        .chain(SCRIPT_ENGINE_ARTIFACTS.iter())
-        .chain(MOD_ARTIFACTS.iter())
+    CORE_ARTIFACTS.iter().chain(SCRIPT_ENGINE_ARTIFACTS.iter())
 }
 
 pub fn core_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
@@ -329,11 +333,26 @@ pub fn core_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
 }
 
 pub fn runtime_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    SCRIPT_ENGINE_ARTIFACTS.iter().chain(MOD_ARTIFACTS.iter())
+    SCRIPT_ENGINE_ARTIFACTS.iter()
 }
 
 pub fn cargo_dll_name(target_stem: &str) -> String {
     format!("{target_stem}.dll")
+}
+
+pub fn cargo_target_dir(
+    workspace_root: &Utf8Path,
+
+    profile: CargoProfile,
+
+    target: Option<&str>,
+) -> Utf8PathBuf {
+    let mut dir = workspace_root.join("target");
+    if let Some(target) = explicit_target(target) {
+        dir = dir.join(target);
+    }
+
+    dir.join(profile.cargo_dir())
 }
 
 pub fn artifact_binary_path(
@@ -341,12 +360,11 @@ pub fn artifact_binary_path(
 
     profile: CargoProfile,
 
+    target: Option<&str>,
+
     target_stem: &str,
 ) -> Utf8PathBuf {
-    workspace_root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join(cargo_dll_name(target_stem))
+    cargo_target_dir(workspace_root, profile, target).join(cargo_dll_name(target_stem))
 }
 
 pub fn artifact_pdb_path(
@@ -354,12 +372,11 @@ pub fn artifact_pdb_path(
 
     profile: CargoProfile,
 
+    target: Option<&str>,
+
     target_stem: &str,
 ) -> Utf8PathBuf {
-    workspace_root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join(format!("{target_stem}.pdb"))
+    cargo_target_dir(workspace_root, profile, target).join(format!("{target_stem}.pdb"))
 }
 
 pub fn artifact_import_lib_path(
@@ -367,18 +384,30 @@ pub fn artifact_import_lib_path(
 
     profile: CargoProfile,
 
+    target: Option<&str>,
+
     binary_name: &str,
 ) -> Utf8PathBuf {
-    workspace_root
-        .join("target")
-        .join(profile.cargo_dir())
-        .join(format!("{binary_name}.dll.lib"))
+    cargo_target_dir(workspace_root, profile, target).join(format!("{binary_name}.dll.lib"))
 }
 
-pub fn package_stage_dir(workspace_root: &Utf8Path, profile: CargoProfile) -> Utf8PathBuf {
-    workspace_root
-        .join("target")
-        .join("package")
-        .join(profile.cargo_dir())
-        .join("ue4ss")
+pub fn package_profile_dir(
+    workspace_root: &Utf8Path,
+    profile: CargoProfile,
+    target: Option<&str>,
+) -> Utf8PathBuf {
+    let mut dir = workspace_root.join("target").join("package");
+    if let Some(target) = explicit_target(target) {
+        dir = dir.join(target);
+    }
+
+    dir.join(profile.cargo_dir())
+}
+
+pub fn package_stage_dir(
+    workspace_root: &Utf8Path,
+    profile: CargoProfile,
+    target: Option<&str>,
+) -> Utf8PathBuf {
+    package_profile_dir(workspace_root, profile, target).join("ue4ss")
 }

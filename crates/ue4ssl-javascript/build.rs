@@ -53,7 +53,7 @@ fn main() {
             "crates/ue4ssl-unreal-support/vendor/Constructs/include",
             "crates/ue4ssl-unreal-support/vendor/MProgram/include",
             "crates/ue4ssl-unreal-support/vendor/Function/include",
-            "crates/ue4ss-hook-rs/include",
+            "crates/ue4ssl-hook/include",
         ],
     );
 
@@ -79,7 +79,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);
     }
@@ -188,7 +188,7 @@ fn common_include_dirs(workspace_root: &std::path::Path) -> Vec<PathBuf> {
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-        workspace_root.join("crates/ue4ss-hook-rs/include"),
+        workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 
     let unreal_src = workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/src");

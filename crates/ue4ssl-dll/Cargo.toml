@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 ue4ssl_host.workspace = true
 ue4ssl_core.workspace = true
-ue4ss_hook_rs.workspace = true
+ue4ssl-hook.workspace = true
 patternsleuth_bind.workspace = true
 ue4ssl-native-support = { path = "../ue4ssl-native-support" }
 ue4ssl-unreal-support.workspace = true

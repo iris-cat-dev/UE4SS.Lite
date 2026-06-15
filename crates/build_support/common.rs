@@ -46,7 +46,7 @@ pub struct GeneratedAbiIncludeRoots {
 
 pub const UE4SSL_CPP_SUPPORT_ROOT: &str = "crates/ue4ssl-cpp-support/vendor/UE4SSL";
 pub const UE4SSL_UNREAL_SUPPORT_ROOT: &str = "crates/ue4ssl-unreal-support/vendor";
-pub const UE4SS_HOOK_ROOT: &str = "crates/ue4ss-hook-rs";
+pub const UE4SS_HOOK_ROOT: &str = "crates/ue4ssl-hook";
 
 pub fn workspace_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
     for candidate in manifest_dir.ancestors() {
@@ -62,6 +62,10 @@ pub fn workspace_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
 }
 
 pub fn target_dir(workspace_root: &Path, profile: BuildProfile) -> PathBuf {
+    if let Some(target_dir) = target_dir_from_out_dir(profile) {
+        return target_dir;
+    }
+
     workspace_root.join("target").join(profile.cargo_dir())
 }
 
@@ -75,6 +79,19 @@ pub fn ue4ssl_unreal_vendor_root(workspace_root: &Path) -> PathBuf {
 
 pub fn unreal_root(workspace_root: &Path) -> PathBuf {
     ue4ssl_unreal_vendor_root(workspace_root).join("Unreal")
+}
+
+fn target_dir_from_out_dir(profile: BuildProfile) -> Option<PathBuf> {
+    let mut dir = PathBuf::from(std::env::var_os("OUT_DIR")?);
+    loop {
+        if dir.file_name() == Some(OsStr::new(profile.cargo_dir())) {
+            return Some(dir);
+        }
+
+        if !dir.pop() {
+            return None;
+        }
+    }
 }
 
 pub fn ue4ss_hook_root(workspace_root: &Path) -> PathBuf {
