@@ -20,8 +20,8 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 - `crates/ue4ssl-dll`: Rust entry point for the core `UE4SSL.dll`.
 - `crates/ue4ssl-core`, `crates/ue4ssl-host`, `crates/ue4ssl-abi`: Rust runtime logic, host API, and generated C/C++ ABI headers.
 - `crates/ue4ssl-native-support`: shared native support libraries such as Input, DynamicOutput, Helpers, String, and SinglePassSigScanner.
-- `crates/ue4ssl-unreal-support`: vendored Unreal, Constructs, Function, and MProgram sources; builds `ue4ssl_unreal_cpp.lib`.
-- `crates/ue4ssl-cpp-support`: vendored UE4SSL C++ boundary sources; builds `ue4ssl_core_cpp.lib`.
+- `crates/ue4ssl-unreal-support`: vendored Unreal, Constructs, and Function sources; builds `ue4ssl_unreal_cpp.lib`.
+- `crates/ue4ssl-cpp-support`: vendored UE4SSL and MProgram C++ boundary sources; builds `ue4ssl_core_cpp.lib`.
 - `crates/ue4ssl-hook`: Rust implementation of UE4SSHook plus C++ compatibility headers.
 - `crates/ue4ssl-javascript*` and `crates/ue4ssl-lua*`: script engine runtimes and VM support crates.
 - `Mods/*/native`: native mods that are part of the Cargo workspace.

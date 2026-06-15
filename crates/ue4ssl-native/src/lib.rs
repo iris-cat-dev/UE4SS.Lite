@@ -96,10 +96,9 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
 
         include_roots: &[
             "crates/ue4ssl-native-support/vendor/Input/include",
-            "crates/ue4ssl-native-support/vendor/Helpers/include",
+            "crates/ue4ssl-native-support/vendor/Common/include",
             "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
             "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
-            "crates/ue4ssl-native-support/vendor/String/include",
             "crates/ue4ssl-hook/include",
         ],
     },
@@ -108,14 +107,13 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
 
         strategy: NativeStrategy::BuildRsCc,
 
-        legacy_targets: &["Constructs", "Function", "MProgram", "Unreal"],
+        legacy_targets: &["Constructs", "Function", "Unreal"],
 
         source_roots: &["crates/ue4ssl-unreal-support/vendor/Unreal/src"],
 
         include_roots: &[
-            "crates/ue4ssl-unreal-support/vendor/Constructs/include",
+            "crates/ue4ssl-native-support/vendor/Common/include",
             "crates/ue4ssl-unreal-support/vendor/Function/include",
-            "crates/ue4ssl-unreal-support/vendor/MProgram/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/generated_include",
         ],
@@ -125,14 +123,14 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
 
         strategy: NativeStrategy::BuildRsCc,
 
-        legacy_targets: &["UE4SSL"],
+        legacy_targets: &["UE4SSL", "MProgram"],
 
         source_roots: &["crates/ue4ssl-cpp-support/vendor/UE4SSL/src"],
 
         include_roots: &[
             "crates/ue4ssl-cpp-support/vendor/UE4SSL/include",
             "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include",
-            "crates/ue4ssl-native-support/vendor/String/include",
+            "crates/ue4ssl-native-support/vendor/Common/include",
         ],
     },
     NativeGroup {

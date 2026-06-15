@@ -1,5 +1,8 @@
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <utility>
 
 #include <Input/Handler.hpp>
 
@@ -7,6 +10,28 @@ extern "C"
 {
     auto ue4ssl_native_input_is_key_down(int32_t key) -> uint8_t;
     auto ue4ssl_native_input_foreground_class_matches(const uint16_t* class_name) -> uint8_t;
+    auto ue4ssl_native_input_handler_register_keydown_event(
+            void* handler,
+            uint8_t key,
+            const uint8_t* modifier_keys,
+            size_t modifier_key_count,
+            void (*callback)(void*),
+            void* callback_data) -> void;
+    auto ue4ssl_native_input_handler_process_event(void* handler) -> void;
+    auto ue4ssl_native_input_handler_get_allow_input(void* handler) -> uint8_t;
+    auto ue4ssl_native_input_handler_set_allow_input(void* handler, uint8_t allow_input) -> void;
+}
+
+namespace
+{
+    auto native_callback_trampoline(void* callback_data) -> void
+    {
+        auto* callback = static_cast<RC::Input::EventCallbackCallable*>(callback_data);
+        if (callback)
+        {
+            (*callback)();
+        }
+    }
 }
 
 namespace RC::Input
@@ -32,6 +57,12 @@ namespace RC::Input
         }
 
         return false;
+    }
+
+    Handler::~Handler()
+    {
+        ue4ssl_native_input_handler_destroy(m_native_handler);
+        m_native_handler = nullptr;
     }
 
     auto Handler::are_modifier_keys_down(const std::vector<ModifierKey>& required_modifier_keys) -> bool
@@ -72,94 +103,7 @@ namespace RC::Input
 
     auto Handler::process_event() -> void
     {
-        if (!is_program_focused())
-        {
-            return;
-        }
-
-        std::vector<EventCallbackCallable> callbacks_to_call{};
-
-        bool skip_this_frame = !get_allow_input();
-        bool is_any_modifier_keys_down = false;
-        bool any_keys_are_down = false;
-
-        if (m_any_keys_are_down)
-        {
-            skip_this_frame = true;
-        }
-
-        // Check if any modifier keys are down
-        for (auto& [modifier_key, key_is_down] : m_modifier_keys_down)
-        {
-            if (is_key_down(static_cast<int32_t>(modifier_key)))
-            {
-                is_any_modifier_keys_down = true;
-                key_is_down = true;
-            }
-            else
-            {
-                key_is_down = false;
-            }
-        }
-
-        for (auto& key_set_data : m_key_sets)
-        {
-            for (auto& [key, key_data_array] : key_set_data.key_data)
-            {
-                for (auto& key_data : key_data_array)
-                {
-                    if (is_key_down(static_cast<int32_t>(key)) && !key_data.is_down)
-                    {
-                        any_keys_are_down = true;
-                        bool should_propagate = true;
-
-                        if (key_data.requires_modifier_keys)
-                        {
-                            if (!are_modifier_keys_down(key_data.required_modifier_keys))
-                            {
-                                should_propagate = false;
-                            }
-                        }
-
-                        if (!key_data.requires_modifier_keys && is_any_modifier_keys_down)
-                        {
-                            should_propagate = false;
-                        }
-
-                        if (should_propagate)
-                        {
-                            key_data.is_down = true;
-                            for (const auto& callback : key_data.callbacks)
-                            {
-                                callbacks_to_call.emplace_back(callback);
-                            }
-                        }
-                    }
-                    else if (!is_key_down(static_cast<int32_t>(key)) && key_data.is_down)
-                    {
-                        key_data.is_down = false;
-                    }
-                }
-            }
-        }
-
-        if (any_keys_are_down)
-        {
-            m_any_keys_are_down = true;
-        }
-        else
-        {
-            m_any_keys_are_down = false;
-        }
-
-        for (const auto& callback : callbacks_to_call)
-        {
-            if (skip_this_frame)
-            {
-                return;
-            }
-            callback();
-        }
+        ue4ssl_native_input_handler_process_event(m_native_handler);
     }
 
     auto Handler::register_keydown_event(Input::Key key, EventCallbackCallable callback, uint8_t custom_data, void* custom_data2) -> void
@@ -177,9 +121,20 @@ namespace RC::Input
         }();
 
         KeyData& key_data = key_set.key_data[key].emplace_back();
+        auto native_callback = std::make_unique<EventCallbackCallable>(callback);
+        auto* native_callback_ptr = native_callback.get();
+        m_native_callbacks.emplace_back(std::move(native_callback));
         key_data.callbacks.emplace_back(callback);
         key_data.custom_data = custom_data;
         key_data.custom_data2 = custom_data2;
+
+        ue4ssl_native_input_handler_register_keydown_event(
+                m_native_handler,
+                static_cast<uint8_t>(key),
+                nullptr,
+                0,
+                native_callback_trampoline,
+                native_callback_ptr);
     }
 
     auto Handler::register_keydown_event(
@@ -198,6 +153,9 @@ namespace RC::Input
         }();
 
         KeyData& key_data = key_set.key_data[key].emplace_back();
+        auto native_callback = std::make_unique<EventCallbackCallable>(callback);
+        auto* native_callback_ptr = native_callback.get();
+        m_native_callbacks.emplace_back(std::move(native_callback));
         key_data.callbacks.emplace_back(callback);
         key_data.custom_data = custom_data;
         key_data.custom_data2 = custom_data2;
@@ -210,6 +168,14 @@ namespace RC::Input
                 key_data.required_modifier_keys.emplace_back(modifier_key);
             }
         }
+
+        ue4ssl_native_input_handler_register_keydown_event(
+                m_native_handler,
+                static_cast<uint8_t>(key),
+                reinterpret_cast<const uint8_t*>(modifier_keys.data()),
+                modifier_keys.size(),
+                native_callback_trampoline,
+                native_callback_ptr);
     }
 
     auto Handler::is_keydown_event_registered(Input::Key key) -> bool
@@ -338,11 +304,13 @@ namespace RC::Input
 
     auto Handler::get_allow_input() -> bool
     {
+        m_allow_input = ue4ssl_native_input_handler_get_allow_input(m_native_handler) != 0;
         return m_allow_input;
     }
 
     auto Handler::set_allow_input(bool new_value) -> void
     {
         m_allow_input = new_value;
+        ue4ssl_native_input_handler_set_allow_input(m_native_handler, static_cast<uint8_t>(new_value));
     }
 } // namespace RC::Input

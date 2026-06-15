@@ -20,19 +20,15 @@ fn main() {
 
     let lua_raw_dir = workspace_root.join("crates/ue4ssl-lua-support/vendor/LuaRaw");
     let lua_made_simple_dir = workspace_root.join("crates/ue4ssl-lua-support/vendor/LuaMadeSimple");
-    let helpers_include =
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Helpers/include");
-    let string_include = workspace_root.join("crates/ue4ssl-native-support/vendor/String/include");
+    let common_include = workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include");
 
     require_path_exists("ue4ssl-lua-support", &lua_raw_dir);
     require_path_exists("ue4ssl-lua-support", &lua_made_simple_dir);
-    require_path_exists("ue4ssl-lua-support", &helpers_include);
-    require_path_exists("ue4ssl-lua-support", &string_include);
+    require_path_exists("ue4ssl-lua-support", &common_include);
 
     emit_rerun_for_tree(&lua_raw_dir);
     emit_rerun_for_tree(&lua_made_simple_dir);
-    emit_rerun_for_tree(&helpers_include);
-    emit_rerun_for_tree(&string_include);
+    emit_rerun_for_tree(&common_include);
 
     let cargo_profile = env::var("PROFILE").unwrap_or_default();
     let is_debug_profile = cargo_profile != "release";
@@ -41,8 +37,7 @@ fn main() {
     compile_lua_made_simple(
         &lua_raw_dir,
         &lua_made_simple_dir,
-        &helpers_include,
-        &string_include,
+        &common_include,
         is_debug_profile,
     );
 }
@@ -80,8 +75,7 @@ fn compile_lua_raw(lua_raw_dir: &Path, is_debug_profile: bool) {
 fn compile_lua_made_simple(
     lua_raw_dir: &Path,
     lua_made_simple_dir: &Path,
-    helpers_include: &Path,
-    string_include: &Path,
+    common_include: &Path,
     is_debug_profile: bool,
 ) {
     let source_dir = lua_made_simple_dir.join("src");
@@ -101,8 +95,7 @@ fn compile_lua_made_simple(
     build.warnings(false);
     build.include(lua_made_simple_dir.join("include"));
     build.include(lua_raw_dir.join("include"));
-    build.include(helpers_include);
-    build.include(string_include);
+    build.include(common_include);
     build.define("RC_LUA_MADE_SIMPLE_EXPORTS", None);
     build.define("RC_LUA_MADE_SIMPLE_BUILD_STATIC", None);
 

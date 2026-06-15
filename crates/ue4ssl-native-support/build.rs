@@ -26,16 +26,15 @@ fn main() {
         workspace_root
             .join("crates/ue4ssl-native-support/vendor/DynamicOutput/src/OutputDevice.cpp"),
         workspace_root.join(
-            "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src/SinglePassSigScanner.cpp",
+            "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src/SinglePassScannerShim.cpp",
         ),
     ];
 
     let includes = [
         workspace_root.join("crates/ue4ssl-native-support/vendor/Input/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Helpers/include"),
+        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/String/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 
@@ -45,12 +44,11 @@ fn main() {
     let tracked_dirs = [
         workspace_root.join("crates/ue4ssl-native-support/vendor/Input/src"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/Input/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Helpers/include"),
+        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/src"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/String/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 

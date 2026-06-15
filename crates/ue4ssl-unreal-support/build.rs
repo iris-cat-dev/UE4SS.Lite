@@ -37,9 +37,7 @@ fn main() {
             unreal_src.clone(),
             unreal_root.join("include"),
             unreal_root.join("generated_include"),
-            workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
-            workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-            workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
+            workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
             workspace_root.join("crates/ue4ssl-hook/include"),
         ],
     );
@@ -48,9 +46,7 @@ fn main() {
         unreal_src.clone(),
         unreal_root.join("include"),
         unreal_root.join("generated_include"),
-        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Constructs/include"),
-        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
-        workspace_root.join("crates/ue4ssl-unreal-support/vendor/MProgram/include"),
+        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);

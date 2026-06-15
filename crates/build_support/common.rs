@@ -46,6 +46,8 @@ pub struct GeneratedAbiIncludeRoots {
 
 pub const UE4SSL_CPP_SUPPORT_ROOT: &str = "crates/ue4ssl-cpp-support/vendor/UE4SSL";
 pub const UE4SSL_UNREAL_SUPPORT_ROOT: &str = "crates/ue4ssl-unreal-support/vendor";
+pub const UE4SSL_NATIVE_COMMON_INCLUDE_ROOT: &str =
+    "crates/ue4ssl-native-support/vendor/Common/include";
 pub const UE4SS_HOOK_ROOT: &str = "crates/ue4ssl-hook";
 
 pub fn workspace_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
@@ -101,10 +103,9 @@ pub fn ue4ss_hook_root(workspace_root: &Path) -> PathBuf {
 pub fn native_support_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
     [
         "crates/ue4ssl-native-support/vendor/Input/include",
-        "crates/ue4ssl-native-support/vendor/Helpers/include",
+        UE4SSL_NATIVE_COMMON_INCLUDE_ROOT,
         "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
         "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
-        "crates/ue4ssl-native-support/vendor/String/include",
     ]
     .into_iter()
     .map(|relative| workspace_root.join(relative))
@@ -114,8 +115,6 @@ pub fn native_support_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
 pub fn unreal_base_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
     let vendor_root = ue4ssl_unreal_vendor_root(workspace_root);
     [
-        vendor_root.join("Constructs").join("include"),
-        vendor_root.join("MProgram").join("include"),
         vendor_root.join("Function").join("include"),
         ue4ss_hook_root(workspace_root).join("include"),
     ]

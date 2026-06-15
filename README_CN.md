@@ -20,8 +20,8 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 - `crates/ue4ssl-dll`：核心 `UE4SSL.dll` 的 Rust 入口。
 - `crates/ue4ssl-core`、`crates/ue4ssl-host`、`crates/ue4ssl-abi`：Rust 运行时逻辑、宿主 API 和生成的 C/C++ ABI 头。
 - `crates/ue4ssl-native-support`：Input、DynamicOutput、Helpers、String、SinglePassSigScanner 等共享 native 支撑库。
-- `crates/ue4ssl-unreal-support`：vendored Unreal、Constructs、Function、MProgram 源码；构建 `ue4ssl_unreal_cpp.lib`。
-- `crates/ue4ssl-cpp-support`：vendored UE4SSL C++ 边界源码；构建 `ue4ssl_core_cpp.lib`。
+- `crates/ue4ssl-unreal-support`：vendored Unreal、Constructs、Function 源码；构建 `ue4ssl_unreal_cpp.lib`。
+- `crates/ue4ssl-cpp-support`：vendored UE4SSL 和 MProgram C++ 边界源码；构建 `ue4ssl_core_cpp.lib`。
 - `crates/ue4ssl-hook`：UE4SSHook 的 Rust 实现和 C++ 兼容头。
 - `crates/ue4ssl-javascript*` 与 `crates/ue4ssl-lua*`：脚本引擎运行时和 VM support crate。
 - `Mods/*/native`：纳入 Cargo workspace 的原生 Mod。
