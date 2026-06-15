@@ -49,7 +49,7 @@ fn main() {
             "crates/ue4ssl-native-support/vendor/Common/include",
             "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
             "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
-            "crates/ue4ssl-unreal-support/vendor/Function/include",
+            "crates/ue4ssl-unreal-support/vendor/Unreal/include/Function",
             "crates/ue4ssl-hook/include",
         ],
     );
@@ -72,7 +72,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
-        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
+        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Function"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);
@@ -178,7 +178,7 @@ fn common_include_dirs(workspace_root: &std::path::Path) -> Vec<PathBuf> {
         workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
-        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Function/include"),
+        workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Function"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 

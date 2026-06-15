@@ -10,13 +10,11 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ue4ssl_host.workspace = true
-ue4ssl_core.workspace = true
+ue4ssl-runtime.workspace = true
 ue4ssl-hook.workspace = true
 patternsleuth_bind.workspace = true
-ue4ssl-native-support = { path = "../ue4ssl-native-support" }
 ue4ssl-unreal-support.workspace = true
-ue4ssl-cpp-support.workspace = true
+ue4ssl-support.workspace = true
 
 [build-dependencies]
 cc.workspace = true

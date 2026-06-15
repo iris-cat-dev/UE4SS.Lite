@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::ini::ParsedIni;
+use super::ini::ParsedIni;
 
 const DEFAULT_SETTINGS: &str = r#"
 [General]

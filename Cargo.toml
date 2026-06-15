@@ -3,18 +3,15 @@ resolver = "2"
 members = [
     "crates/xtask",
     "crates/ue4ssl-abi",
-    "crates/ue4ssl-native",
-    "crates/ue4ssl-native-support",
     "crates/ue4ssl-unreal-support",
-    "crates/ue4ssl-cpp-support",
+    "crates/ue4ssl-support",
     "crates/ue4ssl-javascript-support",
     "crates/ue4ssl-lua-support",
-    "crates/ue4ssl-host",
+    "crates/ue4ssl-runtime",
     "crates/ue4ssl-dll",
     "crates/ue4ssl-javascript",
     "crates/ue4ssl-lua",
     "crates/ue4ssl-proxy",
-    "crates/ue4ssl-core",
     "crates/patternsleuth",
     "crates/patternsleuth-scanner",
     "crates/patternsleuth-bind",
@@ -48,11 +45,9 @@ strum = { version = "0.25.0", features = ["strum_macros", "derive"] }
 windows = "0.52.0"
 
 ue4ssl_abi = { path = "crates/ue4ssl-abi" }
-ue4ssl_native = { path = "crates/ue4ssl-native" }
-ue4ssl_host = { path = "crates/ue4ssl-host" }
-ue4ssl_core = { path = "crates/ue4ssl-core" }
+ue4ssl-runtime = { path = "crates/ue4ssl-runtime" }
 ue4ssl-unreal-support = { path = "crates/ue4ssl-unreal-support" }
-ue4ssl-cpp-support = { path = "crates/ue4ssl-cpp-support" }
+ue4ssl-support = { path = "crates/ue4ssl-support" }
 ue4ssl-hook = { path = "crates/ue4ssl-hook" }
 patternsleuth = { path = "crates/patternsleuth", features = ["process-internal", "image-pe"] }
 patternsleuth_scanner = { path = "crates/patternsleuth-scanner" }

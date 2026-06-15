@@ -396,8 +396,7 @@ pub extern "C" fn ps_scan_wide_string(
 pub fn force_link_exports() {
     ue4ssl_hook::force_link_exports();
     #[cfg(not(test))]
-    ue4ssl_core::force_link_exports();
-    ue4ssl_host::force_link_exports();
+    ue4ssl_runtime::force_link_exports();
     let _ = ps_scan as *const () as usize;
     let _ = ps_scan_aob as *const () as usize;
     let _ = ps_scan_wide_string as *const () as usize;

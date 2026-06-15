@@ -20,21 +20,6 @@ const ACTION_FIRE_PROGRAM_START: u32 = 8;
 const STARTUP_ACTION_START_NAMED_MOD: u32 = 1;
 const STARTUP_ACTION_START_DISCOVERED_MODS: u32 = 2;
 
-const UE4SSL_CSHARP: &[u16] = &[
-    b'U' as u16,
-    b'E' as u16,
-    b'4' as u16,
-    b'S' as u16,
-    b'S' as u16,
-    b'L' as u16,
-    b'.' as u16,
-    b'C' as u16,
-    b'S' as u16,
-    b'h' as u16,
-    b'a' as u16,
-    b'r' as u16,
-    b'p' as u16,
-];
 const UE4SSL_JAVASCRIPT: &[u16] = &[
     b'U' as u16,
     b'E' as u16,
@@ -65,41 +50,6 @@ const UE4SSL_LUA: &[u16] = &[
     b'L' as u16,
     b'u' as u16,
     b'a' as u16,
-];
-const UE4SSL_DYNAMIC_LOAD_PAK: &[u16] = &[
-    b'U' as u16,
-    b'E' as u16,
-    b'4' as u16,
-    b'S' as u16,
-    b'S' as u16,
-    b'L' as u16,
-    b'.' as u16,
-    b'D' as u16,
-    b'y' as u16,
-    b'n' as u16,
-    b'a' as u16,
-    b'm' as u16,
-    b'i' as u16,
-    b'c' as u16,
-    b'L' as u16,
-    b'o' as u16,
-    b'a' as u16,
-    b'd' as u16,
-    b'P' as u16,
-    b'a' as u16,
-    b'k' as u16,
-];
-const UE4SSL_DRG: &[u16] = &[
-    b'U' as u16,
-    b'E' as u16,
-    b'4' as u16,
-    b'S' as u16,
-    b'S' as u16,
-    b'L' as u16,
-    b'.' as u16,
-    b'D' as u16,
-    b'R' as u16,
-    b'G' as u16,
 ];
 
 fn dll_dispatch_cache() -> &'static Mutex<HashSet<String>> {
@@ -191,19 +141,12 @@ pub extern "C" fn ue4ssl_host_plan_reinstall_sequence(
 pub extern "C" fn ue4ssl_host_plan_mod_startup_sequence() -> HostModStartupSequence {
     catch_unwind(AssertUnwindSafe(|| {
         let mut sequence = HostModStartupSequence::default();
-        push_startup_step(&mut sequence, STARTUP_ACTION_START_NAMED_MOD, UE4SSL_CSHARP);
         push_startup_step(
             &mut sequence,
             STARTUP_ACTION_START_NAMED_MOD,
             UE4SSL_JAVASCRIPT,
         );
         push_startup_step(&mut sequence, STARTUP_ACTION_START_NAMED_MOD, UE4SSL_LUA);
-        push_startup_step(
-            &mut sequence,
-            STARTUP_ACTION_START_NAMED_MOD,
-            UE4SSL_DYNAMIC_LOAD_PAK,
-        );
-        push_startup_step(&mut sequence, STARTUP_ACTION_START_NAMED_MOD, UE4SSL_DRG);
         push_startup_step(&mut sequence, STARTUP_ACTION_START_DISCOVERED_MODS, &[]);
         sequence
     }))
@@ -329,15 +272,12 @@ mod tests {
     fn startup_sequence_keeps_builtin_order_before_discovered_mods() {
         let sequence = ue4ssl_host_plan_mod_startup_sequence();
 
-        assert_eq!(sequence.len, 6);
+        assert_eq!(sequence.len, 3);
         assert_eq!(sequence.steps[0].action, STARTUP_ACTION_START_NAMED_MOD);
-        assert_eq!(startup_name(sequence.steps[0]), "UE4SSL.CSharp");
-        assert_eq!(startup_name(sequence.steps[1]), "UE4SSL.JavaScript");
-        assert_eq!(startup_name(sequence.steps[2]), "UE4SSL.Lua");
-        assert_eq!(startup_name(sequence.steps[3]), "UE4SSL.DynamicLoadPak");
-        assert_eq!(startup_name(sequence.steps[4]), "UE4SSL.DRG");
+        assert_eq!(startup_name(sequence.steps[0]), "UE4SSL.JavaScript");
+        assert_eq!(startup_name(sequence.steps[1]), "UE4SSL.Lua");
         assert_eq!(
-            sequence.steps[5].action,
+            sequence.steps[2].action,
             STARTUP_ACTION_START_DISCOVERED_MODS
         );
     }

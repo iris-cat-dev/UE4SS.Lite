@@ -113,9 +113,9 @@ pub fn native_support_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
 }
 
 pub fn unreal_base_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
-    let vendor_root = ue4ssl_unreal_vendor_root(workspace_root);
+    let unreal_root = unreal_root(workspace_root);
     [
-        vendor_root.join("Function").join("include"),
+        unreal_root.join("include").join("Function"),
         ue4ss_hook_root(workspace_root).join("include"),
     ]
     .into_iter()

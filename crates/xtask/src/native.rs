@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use camino::{Utf8Path, Utf8PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,7 +77,7 @@ pub struct ArtifactSpec {
 
 pub const NATIVE_GROUPS: &[NativeGroup] = &[
     NativeGroup {
-        name: "ue4ssl_native_support",
+        name: "ue4ssl_support",
 
         strategy: NativeStrategy::BuildRsCc,
 
@@ -86,12 +88,15 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
             "DynamicOutput",
             "SinglePassSigScanner",
             "UE4SSHook",
+            "UE4SSL",
+            "MProgram",
         ],
 
         source_roots: &[
             "crates/ue4ssl-native-support/vendor/Input/src",
             "crates/ue4ssl-native-support/vendor/DynamicOutput/src",
             "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src",
+            "crates/ue4ssl-cpp-support/vendor/UE4SSL/src",
         ],
 
         include_roots: &[
@@ -100,6 +105,8 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
             "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
             "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
             "crates/ue4ssl-hook/include",
+            "crates/ue4ssl-cpp-support/vendor/UE4SSL/include",
+            "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include",
         ],
     },
     NativeGroup {
@@ -113,24 +120,9 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
 
         include_roots: &[
             "crates/ue4ssl-native-support/vendor/Common/include",
-            "crates/ue4ssl-unreal-support/vendor/Function/include",
+            "crates/ue4ssl-unreal-support/vendor/Unreal/include/Function",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/generated_include",
-        ],
-    },
-    NativeGroup {
-        name: "ue4ssl_cpp_support",
-
-        strategy: NativeStrategy::BuildRsCc,
-
-        legacy_targets: &["UE4SSL", "MProgram"],
-
-        source_roots: &["crates/ue4ssl-cpp-support/vendor/UE4SSL/src"],
-
-        include_roots: &[
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/include",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include",
-            "crates/ue4ssl-native-support/vendor/Common/include",
         ],
     },
     NativeGroup {
@@ -191,20 +183,6 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
         ],
     },
     NativeGroup {
-        name: "ue4ssl_drg_native",
-
-        strategy: NativeStrategy::BuildRsToolchain,
-
-        legacy_targets: &["UE4SSL.DRG"],
-
-        source_roots: &["Mods/UE4SSL.DRG/native/cpp"],
-
-        include_roots: &[
-            "Mods/UE4SSL.DRG/native/include",
-            "Mods/UE4SSL.DRG/native/cpp",
-        ],
-    },
-    NativeGroup {
         name: "ue4ssl_proxy_native",
 
         strategy: NativeStrategy::BuildRsToolchain,
@@ -255,64 +233,6 @@ pub const SCRIPT_ENGINE_ARTIFACTS: &[ArtifactSpec] = &[
         kind: PackageKind::ScriptEngine,
 
         mod_directory_name: Some("UE4SSL.Lua"),
-
-        extra_stage_roots: &[],
-    },
-];
-
-pub const MOD_ARTIFACTS: &[ArtifactSpec] = &[
-    ArtifactSpec {
-        package_name: "mod-ue4ssl-drg",
-
-        cargo_target_stem: "ue4ssl_drg",
-
-        binary_name: "UE4SSL.DRG",
-
-        kind: PackageKind::Mod,
-
-        mod_directory_name: Some("UE4SSL.DRG"),
-
-        extra_stage_roots: &[],
-    },
-    ArtifactSpec {
-        package_name: "mod-ue4ssl-mintcat",
-
-        cargo_target_stem: "ue4ssl_mintcat",
-
-        binary_name: "UE4SSL.MintCat",
-
-        kind: PackageKind::Mod,
-
-        mod_directory_name: Some("UE4SSL.MintCat"),
-
-        extra_stage_roots: &["Mods/UE4SSL.MintCat/config"],
-    },
-    ArtifactSpec {
-        package_name: "mod-drg-audioreplace",
-
-        cargo_target_stem: "ue4ssl_audioreplace",
-
-        binary_name: "DRGMod.AudioReplace",
-
-        kind: PackageKind::Mod,
-
-        mod_directory_name: Some("DRGMod.AudioReplace"),
-
-        extra_stage_roots: &[
-            "Mods/DRGMod.AudioReplace/config",
-            "Mods/DRGMod.AudioReplace/audio",
-        ],
-    },
-    ArtifactSpec {
-        package_name: "mod-roguecore-repeat-negotiation-cards-native",
-
-        cargo_target_stem: "ue4ssl_roguecore_repeat",
-
-        binary_name: "RogueCore.RepeatNegotiationCards.Native",
-
-        kind: PackageKind::Mod,
-
-        mod_directory_name: Some("RogueCore.RepeatNegotiationCards.Native"),
 
         extra_stage_roots: &[],
     },

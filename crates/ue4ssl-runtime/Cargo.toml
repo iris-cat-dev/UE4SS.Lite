@@ -1,5 +1,5 @@
 [package]
-name = "ue4ssl_host"
+name = "ue4ssl-runtime"
 edition.workspace = true
 version.workspace = true
 publish.workspace = true

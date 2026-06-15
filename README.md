@@ -18,10 +18,9 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 ## Repository Layout
 
 - `crates/ue4ssl-dll`: Rust entry point for the core `UE4SSL.dll`.
-- `crates/ue4ssl-core`, `crates/ue4ssl-host`, `crates/ue4ssl-abi`: Rust runtime logic, host API, and generated C/C++ ABI headers.
-- `crates/ue4ssl-native-support`: shared native support libraries such as Input, DynamicOutput, Helpers, String, and SinglePassSigScanner.
+- `crates/ue4ssl-runtime`, `crates/ue4ssl-abi`: Rust runtime logic, host API, and generated C/C++ ABI headers.
+- `crates/ue4ssl-support`: shared native support libraries plus the vendored UE4SSL and MProgram C++ boundary sources; builds `ue4ssl_native_support_cpp.lib` and `ue4ssl_core_cpp.lib`.
 - `crates/ue4ssl-unreal-support`: vendored Unreal, Constructs, and Function sources; builds `ue4ssl_unreal_cpp.lib`.
-- `crates/ue4ssl-cpp-support`: vendored UE4SSL and MProgram C++ boundary sources; builds `ue4ssl_core_cpp.lib`.
 - `crates/ue4ssl-hook`: Rust implementation of UE4SSHook plus C++ compatibility headers.
 - `crates/ue4ssl-javascript*` and `crates/ue4ssl-lua*`: script engine runtimes and VM support crates.
 - `Mods/*/native`: native mods that are part of the Cargo workspace.
@@ -107,7 +106,7 @@ cargo ue4ssl-install --destination "<Game>/Binaries/Win64/ue4ss"
 cargo ue4ssl-install --profile release --destination "<Game>/Binaries/Win64/ue4ss"
 ```
 
-The package step copies the core DLL, script engine DLLs, native mod DLLs, PDBs, and any configured resources according to the artifact metadata in `crates/ue4ssl-native`.
+The package step copies the core DLL, script engine DLLs, native mod DLLs, PDBs, and any configured resources according to the artifact metadata embedded in `crates/xtask`.
 
 ## Proxy DLL
 

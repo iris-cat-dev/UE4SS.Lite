@@ -8,5 +8,4 @@ publish.workspace = true
 patternsleuth.workspace = true
 ue4ssl-hook.workspace = true
 ue4ssl_abi.workspace = true
-ue4ssl_core.workspace = true
-ue4ssl_host.workspace = true
+ue4ssl-runtime.workspace = true

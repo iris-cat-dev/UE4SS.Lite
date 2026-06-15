@@ -32,11 +32,16 @@ fn main() {
     emit_dylib_link("psapi");
     emit_dylib_link("d3d11");
 
-    let core_archive = support_archive_from_env("ue4ssl_cpp_support", "archive");
+    let support_archive = support_archive_from_env("ue4ssl_support", "archive");
+    let native_support_archive = support_archive_from_env("ue4ssl_support", "native_archive");
     let unreal_archive = support_archive_from_env("ue4ssl_unreal_support", "archive");
     println!(
         "cargo:rustc-link-arg-cdylib={}",
-        whole_archive_flag(&core_archive)
+        whole_archive_flag(&support_archive)
+    );
+    println!(
+        "cargo:rustc-link-arg-cdylib={}",
+        whole_archive_flag(&native_support_archive)
     );
     println!(
         "cargo:rustc-link-arg-cdylib={}",

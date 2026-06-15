@@ -3,12 +3,14 @@ use std::{env, fs};
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
-use ue4ssl_native::{
+use native::{
     artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, core_artifacts,
     default_artifacts, package_profile_dir, package_stage_dir, runtime_artifacts, ArtifactSpec,
     CargoProfile, PackageKind,
 };
 use xshell::{cmd, Shell};
+
+mod native;
 
 #[derive(Parser)]
 #[command(author, version, about = "UE4SSL Cargo orchestration")]
@@ -250,14 +252,7 @@ fn build_native_support(profile: CargoProfile, target: Option<&str>) -> Result<(
     let root = workspace_root()?;
     let shell = Shell::new()?;
     prepare_cargo_shell(&shell, &root);
-    let package_args = [
-        "-p",
-        "ue4ssl-native-support",
-        "-p",
-        "ue4ssl-unreal-support",
-        "-p",
-        "ue4ssl-cpp-support",
-    ];
+    let package_args = ["-p", "ue4ssl-unreal-support", "-p", "ue4ssl-support"];
 
     let package_args = package_args
         .iter()
