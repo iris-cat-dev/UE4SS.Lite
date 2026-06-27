@@ -35,6 +35,7 @@ fn main() {
     let support_archive = support_archive_from_env("ue4ssl_support", "archive");
     let native_support_archive = support_archive_from_env("ue4ssl_support", "native_archive");
     let unreal_archive = support_archive_from_env("ue4ssl_unreal_support", "archive");
+    let object_searcher_archive = support_archive_from_env("ue4ssl_object_searcher", "archive");
     println!(
         "cargo:rustc-link-arg-cdylib={}",
         whole_archive_flag(&support_archive)
@@ -46,5 +47,9 @@ fn main() {
     println!(
         "cargo:rustc-link-arg-cdylib={}",
         whole_archive_flag(&unreal_archive)
+    );
+    println!(
+        "cargo:rustc-link-arg-cdylib={}",
+        whole_archive_flag(&object_searcher_archive)
     );
 }

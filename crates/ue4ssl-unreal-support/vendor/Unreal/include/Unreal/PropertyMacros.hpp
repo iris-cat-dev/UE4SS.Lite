@@ -27,7 +27,7 @@
  *         RC_INTERNAL_DEFINE_BP_PROPERTY_PRIVATE(bool, bCanBeDamaged);
  *      }
  *
- *      auto Character = static_cast<ACharacter*>(FindFirstOf(STR("Character")));
+ *      auto Character = static_cast<ACharacter*>(FindFirstInstanceOfClass(STR("Character")));
  *      Output::send(STR("You've jumped {}/{} times.\n"), Character->GetJumpCurrentCount(), Character->GetJumpMaxCount());
  *      Character->SetJumpMaxCount(3);
  *      Output::send(STR("You can now jump a total of 3 times.\n"));

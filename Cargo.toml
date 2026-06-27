@@ -4,6 +4,7 @@ members = [
     "crates/xtask",
     "crates/ue4ssl-abi",
     "crates/ue4ssl-unreal-support",
+    "crates/ue4ssl-object-searcher",
     "crates/ue4ssl-support",
     "crates/ue4ssl-javascript-support",
     "crates/ue4ssl-lua-support",
@@ -11,6 +12,7 @@ members = [
     "crates/ue4ssl-dll",
     "crates/ue4ssl-javascript",
     "crates/ue4ssl-lua",
+    "crates/ue4ssl-paksync",
     "crates/ue4ssl-proxy",
     "crates/patternsleuth",
     "crates/patternsleuth-scanner",
@@ -47,6 +49,7 @@ windows = "0.52.0"
 ue4ssl_abi = { path = "crates/ue4ssl-abi" }
 ue4ssl-runtime = { path = "crates/ue4ssl-runtime" }
 ue4ssl-unreal-support = { path = "crates/ue4ssl-unreal-support" }
+ue4ssl-object-searcher = { path = "crates/ue4ssl-object-searcher" }
 ue4ssl-support = { path = "crates/ue4ssl-support" }
 ue4ssl-hook = { path = "crates/ue4ssl-hook" }
 patternsleuth = { path = "crates/patternsleuth", features = ["process-internal", "image-pe"] }

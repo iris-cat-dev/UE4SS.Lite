@@ -37,6 +37,10 @@ namespace RC
         General.EnableSlowCppModUpdateGuard = to_bool(settings.general_enable_slow_cpp_mod_update_guard);
         General.SlowCppModUpdateThresholdMs = settings.general_slow_cpp_mod_update_threshold_ms;
 
+        ObjectSearch.UseNativeStaticFindObjectFast = to_bool(settings.object_search_use_native_static_find_object_fast);
+        ObjectSearch.UseNativeClassEnumeration = to_bool(settings.object_search_use_native_class_enumeration);
+        ObjectSearch.CompareNativeSearchResults = to_bool(settings.object_search_compare_native_search_results);
+
         EngineVersionOverride.MajorVersion = settings.engine_version_override_major_version;
         EngineVersionOverride.MinorVersion = settings.engine_version_override_minor_version;
 
@@ -64,6 +68,7 @@ namespace RC
         Hooks.HookAActorTick = to_bool(settings.hooks_hook_aactor_tick);
         Hooks.HookProcessEvent = to_bool(settings.hooks_hook_process_event);
         Hooks.HookUFunctionBind = to_bool(settings.hooks_hook_ufunction_bind);
+        Hooks.HookStaticConstructObjectObjectCache = to_bool(settings.hooks_hook_static_construct_object_object_cache);
         Hooks.FExecVTableOffsetInLocalPlayer = settings.hooks_fexec_vtable_offset_in_local_player;
     }
 } // namespace RC

@@ -29,6 +29,13 @@ namespace RC
             int64_t SlowCppModUpdateThresholdMs{4000};
         } General;
 
+        struct SectionObjectSearch
+        {
+            bool UseNativeStaticFindObjectFast{false};
+            bool UseNativeClassEnumeration{false};
+            bool CompareNativeSearchResults{false};
+        } ObjectSearch;
+
         struct SectionEngineVersionOverride
         {
             int64_t MajorVersion{-1};
@@ -96,6 +103,7 @@ namespace RC
             bool HookAActorTick{true};
             bool HookProcessEvent{true};
             bool HookUFunctionBind{true};
+            bool HookStaticConstructObjectObjectCache{true};
             int64_t FExecVTableOffsetInLocalPlayer{0x28};
         } Hooks;
 

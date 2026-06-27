@@ -179,22 +179,27 @@ namespace RC::Seh
         return safe_process_event_inner(object, function, params) != 0;
     }
 
-    static Unreal::UObject* safe_find_first_of_inner(const wchar_t* name)
+    static Unreal::UObject* safe_find_first_instance_of_class_inner(const wchar_t* name)
     {
         __try
         {
-            return Unreal::UObjectGlobals::FindFirstOf(name);
+            return Unreal::UObjectGlobals::FindFirstInstanceOfClass(name);
         }
-        __except (FilterAndLog(L"UE4SS", L"FindFirstOf", GetExceptionCode(), GetExceptionInformation()))
+        __except (FilterAndLog(L"UE4SS", L"FindFirstInstanceOfClass", GetExceptionCode(), GetExceptionInformation()))
         {
             return nullptr;
         }
     }
 
-    Unreal::UObject* SafeFindFirstOf(const wchar_t* name)
+    Unreal::UObject* SafeFindFirstInstanceOfClass(const wchar_t* name)
     {
         if (!name) return nullptr;
-        return safe_find_first_of_inner(name);
+        return safe_find_first_instance_of_class_inner(name);
+    }
+
+    Unreal::UObject* SafeFindFirstOf(const wchar_t* name)
+    {
+        return SafeFindFirstInstanceOfClass(name);
     }
 
     static Unreal::UObject* safe_static_find_object_inner(const std::wstring* path)

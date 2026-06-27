@@ -45,6 +45,7 @@ fn main() {
             "crates/ue4ssl-unreal-support/vendor/Unreal/src",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/generated_include",
+            "crates/ue4ssl-object-searcher/include",
             "crates/ue4ssl-native-support/vendor/Input/include",
             "crates/ue4ssl-native-support/vendor/Common/include",
             "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
@@ -68,6 +69,7 @@ fn main() {
         workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_src"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
+        workspace_root.join("crates/ue4ssl-object-searcher/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/Input/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
@@ -130,6 +132,7 @@ fn compile_javascript_archive(
         workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"),
         generated_ue4ssl_include.to_path_buf(),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"),
+        workspace_root.join("crates/ue4ssl-object-searcher/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Unreal"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Unreal/Core"),
@@ -179,6 +182,7 @@ fn common_include_dirs(workspace_root: &std::path::Path) -> Vec<PathBuf> {
         workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Function"),
+        workspace_root.join("crates/ue4ssl-object-searcher/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ];
 

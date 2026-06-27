@@ -68,7 +68,8 @@ namespace RC::Seh
 
     RC_UE4SS_API bool SafeProcessEvent(Unreal::UObject* object, Unreal::UFunction* function, void* params);
 
-    RC_UE4SS_API Unreal::UObject*   SafeFindFirstOf(const wchar_t* name);
+    RC_UE4SS_API Unreal::UObject*   SafeFindFirstInstanceOfClass(const wchar_t* name);
+    [[deprecated("Use SafeFindFirstInstanceOfClass instead.")]] RC_UE4SS_API Unreal::UObject* SafeFindFirstOf(const wchar_t* name);
     RC_UE4SS_API Unreal::UObject*   SafeStaticFindObject(const std::wstring& path);
     RC_UE4SS_API Unreal::UFunction* SafeGetFunctionByName(Unreal::UObject* object, const wchar_t* name);
 

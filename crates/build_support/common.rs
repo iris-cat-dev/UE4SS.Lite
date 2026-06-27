@@ -46,6 +46,7 @@ pub struct GeneratedAbiIncludeRoots {
 
 pub const UE4SSL_CPP_SUPPORT_ROOT: &str = "crates/ue4ssl-cpp-support/vendor/UE4SSL";
 pub const UE4SSL_UNREAL_SUPPORT_ROOT: &str = "crates/ue4ssl-unreal-support/vendor";
+pub const UE4SSL_OBJECT_SEARCHER_INCLUDE_ROOT: &str = "crates/ue4ssl-object-searcher/include";
 pub const UE4SSL_NATIVE_COMMON_INCLUDE_ROOT: &str =
     "crates/ue4ssl-native-support/vendor/Common/include";
 pub const UE4SS_HOOK_ROOT: &str = "crates/ue4ssl-hook";
@@ -116,6 +117,7 @@ pub fn unreal_base_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
     let unreal_root = unreal_root(workspace_root);
     [
         unreal_root.join("include").join("Function"),
+        workspace_root.join(UE4SSL_OBJECT_SEARCHER_INCLUDE_ROOT),
         ue4ss_hook_root(workspace_root).join("include"),
     ]
     .into_iter()

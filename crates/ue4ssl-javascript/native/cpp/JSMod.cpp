@@ -27,8 +27,10 @@ extern "C"
 
 namespace RC::JSScript
 {
-    static constexpr std::array<JSCFunction*, 57> GlobalFunctionImplementations{
+    static constexpr std::array<JSCFunction*, 59> GlobalFunctionImplementations{
             js_print,
+            js_find_first_instance_of_class,
+            js_find_all_instances_of_class,
             js_find_first_of,
             js_find_all_of,
             js_find_all_actors_with_interface,

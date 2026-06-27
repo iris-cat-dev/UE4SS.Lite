@@ -14,6 +14,7 @@ ue4ssl-runtime.workspace = true
 ue4ssl-hook.workspace = true
 patternsleuth_bind.workspace = true
 ue4ssl-unreal-support.workspace = true
+ue4ssl-object-searcher.workspace = true
 ue4ssl-support.workspace = true
 
 [build-dependencies]

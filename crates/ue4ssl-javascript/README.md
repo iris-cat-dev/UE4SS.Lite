@@ -7,7 +7,7 @@ JSScriptMod provides JavaScript scripting support for UE4SS using the QuickJS en
 - ES2023 JavaScript support via QuickJS engine
 - UE4 object access through familiar API
 - Module system with ES6 `import`/`export`
-- Similar API to Lua scripting (FindFirstOf, FindAllOf, etc.)
+- Similar API to Lua scripting (FindFirstInstanceOfClass, FindAllInstancesOfClass, etc.)
 - Memory scanning (SigScan) and binary patching (PatchByte/ReadByte)
 
 ## Installation
@@ -38,21 +38,21 @@ Print values to the UE4SS console.
 print("Hello", "World", 123);
 ```
 
-#### `FindFirstOf(className)`
-Find the first object of a given class.
+#### `FindFirstInstanceOfClass(className)`
+Find the first live instance of a given class. `FindFirstOf` is a deprecated legacy alias.
 
 ```javascript
-const engine = FindFirstOf("GameEngine");
+const engine = FindFirstInstanceOfClass("GameEngine");
 if (engine) {
     print(engine.GetFullName());
 }
 ```
 
-#### `FindAllOf(className)`
-Find all objects of a given class.
+#### `FindAllInstancesOfClass(className)`
+Find all live instances of a given class. `FindAllOf` is a deprecated legacy alias.
 
 ```javascript
-const players = FindAllOf("PlayerController");
+const players = FindAllInstancesOfClass("PlayerController");
 for (const player of players) {
     print(player.GetName());
 }
@@ -196,7 +196,7 @@ if (addr) {
 
 ### UObject Methods
 
-When you get a UObject from `FindFirstOf`, `FindAllOf`, etc., you can use these methods:
+When you get a UObject from `FindFirstInstanceOfClass`, `FindAllInstancesOfClass`, etc., you can use these methods:
 
 - `GetFullName()` - Get the full name of the object
 - `GetName()` - Get the short name of the object

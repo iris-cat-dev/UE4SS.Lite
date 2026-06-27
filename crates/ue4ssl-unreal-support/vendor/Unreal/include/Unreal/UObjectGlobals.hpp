@@ -13,6 +13,8 @@
 #include <Unreal/Core/Templates/Function.hpp>
 #include <Unreal/UFunctionStructs.hpp>
 
+#include <Unreal/ObjectSearch/UObjectSearch.hpp>
+
 #include <String/StringType.hpp>
 
 #ifndef UE_WITH_REMOTE_OBJECT_HANDLE
@@ -186,83 +188,7 @@ namespace RC::Unreal::UObjectGlobals
         return StaticConstructObject<ObjectType*>(Params);
     }
 
-    // UE compatible overload for 'FindObject'.
-    RC_UE_API UObject* FindObject(UClass* Class, UObject* InOuter, RC::StringViewType InName, bool bExactClass = false, ObjectSearcher* = nullptr);
-    RC_UE_API UObject* FindObject(UClass* Class, UObject* InOuter, const TCHAR* InName, bool bExactClass = false, ObjectSearcher* = nullptr);
-
-    // Convenience overload for the UE compatible 'FindObject' overload.
-    // It exists so that you don't have to specify all the optional params in order to specify a searcher.
-    RC_UE_API UObject* FindObject(ObjectSearcher&, UClass* Class, UObject* InOuter, RC::StringViewType InName, bool bExactClass = false);
-    RC_UE_API UObject* FindObject(ObjectSearcher&, UClass* Class, UObject* InOuter, const TCHAR* InName, bool bExactClass = false);
-
-    template<UObjectDerivative ObjectType>
-    ObjectType* FindObject(UObject* Outer, const TCHAR* Name, bool ExactClass = false)
-    {
-        return static_cast<ObjectType*>(FindObject(ObjectType::StaticClass(), Outer, Name, ExactClass));
-    }
-
-    // Internal game function implementations
-    // Slow implementation that's to be avoided whenever possible
-    // This only exists for compatibility reasons with old Lua scripts
-    // All params except 'orig_in_name' are also just there for compatibility reasons and do not have any effect
-    RC_UE_API auto StaticFindObject_InternalSlow(UClass* Object, UObject* ChunkIndex, const CharType* OrigInName, bool bExactClass = false) -> UObject*;
-    RC_UE_API auto StaticFindObject_InternalNoToStringFromStrings(const std::vector<StringViewType>& NameParts) -> UObject*;
-    RC_UE_API auto StaticFindObject_InternalNoToStringFromNames(const std::vector<FName>& NameParts) -> UObject*;
-
-    template<UObjectPointerDerivative ObjectType = UObject*>
-    auto StaticFindObject(UClass* ObjectClass, UObject* InObjectPackage, const CharType* OrigInName, bool bExactClass = false) -> ObjectType
-    {
-        return static_cast<ObjectType>(FindObject(ObjectClass, InObjectPackage, OrigInName, bExactClass));
-    }
-    template<UObjectPointerDerivative ObjectType = UObject*>
-    auto StaticFindObject(UClass* ObjectClass, UObject* InObjectPackage, StringViewType OrigInName, bool bExactClass = false) -> ObjectType
-    {
-        return static_cast<ObjectType>(FindObject(ObjectClass, InObjectPackage, OrigInName.data(), bExactClass));
-    }
-
-    template<UObjectPointerDerivative ObjectType = UObject*>
-    auto StaticFindObject(UClass* ObjectClass, UObject* InObjectPackage, const StringType& OrigInName, bool bExactClass = false) -> ObjectType
-    {
-        return static_cast<ObjectType>(FindObject(ObjectClass, InObjectPackage, OrigInName.c_str(), bExactClass));
-    }
-
     // Custom Helpers -> START
-    // Find the first instance of a class
-    // Does not find ClassDefaultObjects (CDO) or non-instances of classes
-    // Takes inheritance into account, that means you can give it an FName of "Controller" and
-    // it will also find instances of "PlayerController" and any instances from any other derived class
-    RC_UE_API auto FindFirstOf(FName Object) -> UObject*;
-    RC_UE_API auto FindFirstOf(const CharType* ClassName) -> UObject*;
-    RC_UE_API auto FindFirstOf(StringViewType ClassName) -> UObject*;
-    RC_UE_API auto FindFirstOf(const StringType& ClassName) -> UObject*;
-    RC_UE_API auto FindFirstOf(std::string_view ClassName) -> UObject*;
-    RC_UE_API auto FindFirstOf(const std::string& ClassName) -> UObject*;
-
-    // Find all instances of a class
-    // Follows the same rules as 'find_first_of'
-    RC_UE_API auto FindAllOf(FName SuperStruct, std::vector<UObject*>& ChunkIndex) -> void;
-    RC_UE_API auto FindAllOf(const CharType* ClassName, std::vector<UObject*>& OutStorage) -> void;
-    RC_UE_API auto FindAllOf(StringViewType ClassName, std::vector<UObject*>& OutStorage) -> void;
-    RC_UE_API auto FindAllOf(const StringType& ClassName, std::vector<UObject*>& OutStorage) -> void;
-    RC_UE_API auto FindAllOf(std::string_view ClassName, std::vector<UObject*>& OutStorage) -> void;
-    RC_UE_API auto FindAllOf(const std::string& ClassName, std::vector<UObject*>& OutStorage) -> void;
-
-    // Find a specified number of objects with the specified class (or none) and name (or none)
-    // Must have at least either class or name, or both
-    // Required & banned flags can be specified or left to the default (no required/banned flags)
-    // Find one or specified amount of objects
-    // Specify 0 for 'num_objects_to_find' to not limit to number of objects to find
-    // The 'flags' parameters for the following functions are of type EObjectFlags
-    RC_UE_API auto FindObjects(size_t Object, const FName ClassName, const FName ObjectShortName, std::vector<UObject*>& OutStorage, int32 RequiredFlags = {}, int32 BannedFlags = {}, bool bExactClass = true) -> void;
-    RC_UE_API auto FindObjects(size_t NumObjectsToFind, const CharType* ClassName, const CharType* ObjectShortName, std::vector<UObject*>& OutStorage, int32 RequiredFlags = {}, int32 BannedFlags = {}, bool bExactClass = true) -> void;
-    RC_UE_API auto FindObject(const FName ClassName, const FName ObjectShortName, int32 RequiredFlags = {}, int32 BannedFlags = {}) -> UObject*;
-    RC_UE_API auto FindObject(const CharType* ClassName, const CharType* ObjectShortName, int32 RequiredFlags = {}, int32 BannedFlags = {}) -> UObject*;
-
-    // Find all objects
-    // The 'flags' parameters for the following functions are of type EObjectFlags
-    RC_UE_API auto FindObjects(const FName ClassName, const FName ObjectShortName, std::vector<UObject*>& OutStorage, int32 RequiredFlags = {}, int32 BannedFlags = {}, bool bExactClass = true) -> void;
-    RC_UE_API auto FindObjects(const CharType* ClassName, const CharType* ObjectShortName, std::vector<UObject*>& OutStorage, int32 RequiredFlags = {}, int32 BannedFlags = {}, bool bExactClass = true) -> void;
-
     // Register a UFunction hook through all known means.
     RC_UE_API auto RegisterHook(class UFunction* Function, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, void*) -> std::pair<int, int>;
     RC_UE_API auto RegisterHook(const StringType& FunctionFullNameNoType, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, void*) -> std::pair<int, int>;
@@ -325,6 +251,3 @@ namespace RC::Unreal::UObjectGlobals
         };
     }
 }
-
-
-

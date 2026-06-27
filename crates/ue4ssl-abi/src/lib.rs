@@ -129,6 +129,7 @@ pub struct PsScanConfig {
     pub gnatives: u8,
     pub console_manager_singleton: u8,
     pub gameengine_tick: u8,
+    pub static_find_object_fast: u8,
 }
 
 #[repr(C)]
@@ -146,6 +147,7 @@ pub struct PsScanResults {
     pub gnatives: usize,
     pub console_manager_singleton: usize,
     pub gameengine_tick: usize,
+    pub static_find_object_fast: usize,
 }
 
 #[repr(C)]
@@ -553,6 +555,7 @@ pub fn render_scan_header() -> String {
     writeln!(output, "        uint8_t gnatives{{}};").unwrap();
     writeln!(output, "        uint8_t console_manager_singleton{{}};").unwrap();
     writeln!(output, "        uint8_t gameengine_tick{{}};").unwrap();
+    writeln!(output, "        uint8_t static_find_object_fast{{}};").unwrap();
     writeln!(output, "    }};").unwrap();
     writeln!(output).unwrap();
     writeln!(output, "    struct PsCtx").unwrap();
@@ -583,6 +586,7 @@ pub fn render_scan_header() -> String {
     writeln!(output, "        size_t gnatives{{}};").unwrap();
     writeln!(output, "        size_t console_manager_singleton{{}};").unwrap();
     writeln!(output, "        size_t gameengine_tick{{}};").unwrap();
+    writeln!(output, "        size_t static_find_object_fast{{}};").unwrap();
     writeln!(output, "    }};").unwrap();
     writeln!(output).unwrap();
     render_layout_asserts(
@@ -625,6 +629,10 @@ pub fn render_scan_header() -> String {
                 offset_of!(PsScanConfig, console_manager_singleton),
             ),
             ("gameengine_tick", offset_of!(PsScanConfig, gameengine_tick)),
+            (
+                "static_find_object_fast",
+                offset_of!(PsScanConfig, static_find_object_fast),
+            ),
         ],
     );
     render_layout_asserts(
@@ -673,6 +681,10 @@ pub fn render_scan_header() -> String {
             (
                 "gameengine_tick",
                 offset_of!(PsScanResults, gameengine_tick),
+            ),
+            (
+                "static_find_object_fast",
+                offset_of!(PsScanResults, static_find_object_fast),
             ),
         ],
     );

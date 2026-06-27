@@ -249,7 +249,7 @@ namespace RC::JSScript
 
         __try
         {
-            return Unreal::UObjectGlobals::FindFirstOf(class_name);
+            return Unreal::UObjectGlobals::FindFirstInstanceOfClass(class_name);
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {

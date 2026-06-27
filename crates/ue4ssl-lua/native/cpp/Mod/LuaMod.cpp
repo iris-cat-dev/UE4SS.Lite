@@ -1404,6 +1404,111 @@ namespace RC
         }
     }
 
+    static auto lua_find_first_instance_of_class(const LuaMadeSimple::Lua& lua, const char* function_name) -> int
+    {
+        // Stack size @ the start of the function is the same as the number of params
+        int32_t stack_size = lua.get_stack_size();
+
+        if (stack_size <= 0)
+        {
+            std::string error_message{"Function '"};
+            error_message.append(function_name).append("' cannot be called with 0 parameters.");
+            lua.throw_error(error_message);
+        }
+
+        std::string error_overload_not_found{"\nNo overload found for function '"};
+        error_overload_not_found.append(function_name).append("'.\nOverloads:\n#1: ");
+        error_overload_not_found.append(function_name).append("(string short_class_name))");
+
+        // Overload #1
+        // P1: string short_name
+        // Ignores any params after P1
+        if (lua.is_string())
+        {
+            Unreal::UObject* object = Unreal::UObjectGlobals::FindFirstInstanceOfClass(ensure_str(lua.get_string()));
+
+            // Construct a Lua object of type 'UObject'
+            // Auto constructing is nullptr safe
+            LuaType::auto_construct_object(lua, object);
+
+            return 1;
+        }
+        else
+        {
+            lua.throw_error(error_overload_not_found);
+        }
+
+        return 0;
+    }
+
+    static auto lua_find_all_instances_of_class(const LuaMadeSimple::Lua& lua, const char* function_name) -> int
+    {
+        // Stack size @ the start of the function is the same as the number of params
+        int32_t stack_size = lua.get_stack_size();
+
+        if (stack_size <= 0)
+        {
+            std::string error_message{"Function '"};
+            error_message.append(function_name).append("' cannot be called with 0 parameters.");
+            lua.throw_error(error_message);
+        }
+
+        std::string error_overload_not_found{"\nNo overload found for function '"};
+        error_overload_not_found.append(function_name).append("'.\nOverloads:\n#1: ");
+        error_overload_not_found.append(function_name).append("(string short_class_name))");
+
+        // Overload #1
+        // P1: string short_name
+        // Ignores any params after P1
+        if (lua.is_string())
+        {
+            constexpr int32_t elements_to_reserve = 40;
+
+            std::vector<Unreal::UObject*> found_unreal_objects;
+
+            // Reserving some space because instance searches are likely to find lots of objects
+            found_unreal_objects.reserve(elements_to_reserve);
+
+            Unreal::UObjectGlobals::FindAllInstancesOfClass(lua.get_string(), found_unreal_objects);
+
+            if (!found_unreal_objects.empty())
+            {
+                LuaMadeSimple::Lua::Table table = lua.prepare_new_table(elements_to_reserve);
+
+                for (size_t count{}; const auto& unreal_object : found_unreal_objects)
+                {
+                    // Increasing the count first, this is to accommodate the one-index based tables of Lua
+                    ++count;
+
+                    table.add_key(count);
+
+                    // Construct a Lua version of a UObject
+                    // It will be at the top of the Lua stack and can act as the value of a key/value pair if fuse_pair() is called
+                    LuaType::auto_construct_object(lua, unreal_object);
+                    table.fuse_pair();
+                }
+
+                table.make_local();
+            }
+            else
+            {
+                lua.set_nil();
+            }
+
+            return 1;
+        }
+        else
+        {
+            lua.throw_error(error_overload_not_found);
+        }
+
+        // This code isn't executed
+        // Lua will error out in the else statement above
+        // This is purely to shut the compiler up
+        lua.set_nil();
+        return 1;
+    }
+
     auto static setup_lua_global_functions_internal(const LuaMadeSimple::Lua& lua, Mod::IsTrueMod is_true_mod) -> void
     {
         lua.register_function("print", LuaLibrary::global_print);
@@ -1517,105 +1622,29 @@ Overloads:
             return 1;
         });
 
-        lua.register_function("FindFirstOf", [](const LuaMadeSimple::Lua& lua) -> int {
-            // Stack size @ the start of the function is the same as the number of params
-            int32_t stack_size = lua.get_stack_size();
-
-            if (stack_size <= 0)
-            {
-                lua.throw_error("Function 'FindFirstOf' cannot be called with 0 parameters.");
-            }
-
-            std::string error_overload_not_found{R"(
-No overload found for function 'FindFirstOf'.
-Overloads:
-#1: FindFirstOf(string short_class_name))"};
-
-            // Overload #1
-            // P1: string short_name
-            // Ignores any params after P1
-            if (lua.is_string())
-            {
-                Unreal::UObject* object = Unreal::UObjectGlobals::FindFirstOf(ensure_str(lua.get_string()));
-
-                // Construct a Lua object of type 'UObject'
-                // Auto constructing is nullptr safe
-                LuaType::auto_construct_object(lua, object);
-
-                return 1;
-            }
-            else
-            {
-                lua.throw_error(error_overload_not_found);
-            }
-
-            return 0;
+        lua.register_function("FindFirstInstanceOfClass", [](const LuaMadeSimple::Lua& lua) -> int {
+            return lua_find_first_instance_of_class(lua, "FindFirstInstanceOfClass");
         });
-
+        lua.register_function("FindFirstOf", [](const LuaMadeSimple::Lua& lua) -> int {
+            static std::atomic_bool warned{false};
+            bool expected{false};
+            if (warned.compare_exchange_strong(expected, true))
+            {
+                Output::send<LogLevel::Warning>(STR("[UE4SS.Lua] FindFirstOf is deprecated; use FindFirstInstanceOfClass\n"));
+            }
+            return lua_find_first_instance_of_class(lua, "FindFirstOf");
+        });
+        lua.register_function("FindAllInstancesOfClass", [](const LuaMadeSimple::Lua& lua) -> int {
+            return lua_find_all_instances_of_class(lua, "FindAllInstancesOfClass");
+        });
         lua.register_function("FindAllOf", [](const LuaMadeSimple::Lua& lua) -> int {
-            // Stack size @ the start of the function is the same as the number of params
-            int32_t stack_size = lua.get_stack_size();
-
-            if (stack_size <= 0)
+            static std::atomic_bool warned{false};
+            bool expected{false};
+            if (warned.compare_exchange_strong(expected, true))
             {
-                lua.throw_error("Function 'FindAllOf' cannot be called with 0 parameters.");
+                Output::send<LogLevel::Warning>(STR("[UE4SS.Lua] FindAllOf is deprecated; use FindAllInstancesOfClass\n"));
             }
-
-            std::string error_overload_not_found{R"(
-No overload found for function 'FindAllOf'.
-Overloads:
-#1: FindAllOf(string short_class_name))"};
-
-            // Overload #1
-            // P1: string short_name
-            // Ignores any params after P1
-            if (lua.is_string())
-            {
-                constexpr int32_t elements_to_reserve = 40;
-
-                std::vector<Unreal::UObject*> found_unreal_objects;
-
-                // Reserving some space because FindAllOf is likely to find lots of objects
-                found_unreal_objects.reserve(elements_to_reserve);
-
-                Unreal::UObjectGlobals::FindAllOf(lua.get_string(), found_unreal_objects);
-
-                if (!found_unreal_objects.empty())
-                {
-                    LuaMadeSimple::Lua::Table table = lua.prepare_new_table(elements_to_reserve);
-
-                    for (size_t count{}; const auto& unreal_object : found_unreal_objects)
-                    {
-                        // Increasing the count first, this is to accommodate the one-index based tables of Lua
-                        ++count;
-
-                        table.add_key(count);
-
-                        // Construct a Lua version of a UObject
-                        // It will be at the top of the Lua stack and can act as the value of a key/value pair if fuse_pair() is called
-                        LuaType::auto_construct_object(lua, unreal_object);
-                        table.fuse_pair();
-                    }
-
-                    table.make_local();
-                }
-                else
-                {
-                    lua.set_nil();
-                }
-
-                return 1;
-            }
-            else
-            {
-                lua.throw_error(error_overload_not_found);
-            }
-
-            // This code isn't executed
-            // Lua will error out in the else statement above
-            // This is purely to shut the compiler up
-            lua.set_nil();
-            return 1;
+            return lua_find_all_instances_of_class(lua, "FindAllOf");
         });
 
         if (is_true_mod == Mod::IsTrueMod::Yes)
@@ -3611,7 +3640,7 @@ Overloads:
                 {
                     throw std::runtime_error{error_overload_not_found};
                 }
-                LuaType::auto_construct_object(lua, Unreal::UObjectGlobals::FindObject(object_class_name, object_short_name, required_flags, banned_flags));
+                LuaType::auto_construct_object(lua, Unreal::UObjectGlobals::FindObjectByClassAndName(object_class_name, object_short_name, required_flags, banned_flags));
             }
             return 1;
         });
@@ -3756,13 +3785,13 @@ Overloads:
             }
 
             std::vector<Unreal::UObject*> objects_found{};
-            Unreal::UObjectGlobals::FindObjects(static_cast<size_t>(num_objects_to_find),
-                                                object_class_name,
-                                                object_short_name,
-                                                objects_found,
-                                                required_flags,
-                                                banned_flags,
-                                                exact_class);
+            Unreal::UObjectGlobals::FindObjectsByClassAndName(static_cast<size_t>(num_objects_to_find),
+                                                              object_class_name,
+                                                              object_short_name,
+                                                              objects_found,
+                                                              required_flags,
+                                                              banned_flags,
+                                                              exact_class);
 
             auto table = lua.prepare_new_table(static_cast<int32_t>(objects_found.size()));
             for (size_t i = 0; i < objects_found.size(); ++i)

@@ -82,6 +82,10 @@ namespace RC::Unreal::UnrealInitializer
 
         // If false, will not use UObject create/delete listeners in GUObjectArray.
         bool bUseUObjectArrayCache{true};
+        bool bHookStaticConstructObjectObjectCache{true};
+        bool bUseNativeStaticFindObjectFast{false};
+        bool bUseNativeClassEnumeration{false};
+        bool bCompareNativeSearchResults{false};
 
         // Which functions to hook.
         bool bHookProcessInternal{false};

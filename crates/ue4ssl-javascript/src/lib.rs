@@ -61,6 +61,14 @@ const GLOBAL_API: &[GlobalApiEntry] = &[
         arity: 1,
     },
     GlobalApiEntry {
+        name: b"FindFirstInstanceOfClass\0",
+        arity: 1,
+    },
+    GlobalApiEntry {
+        name: b"FindAllInstancesOfClass\0",
+        arity: 1,
+    },
+    GlobalApiEntry {
         name: b"FindFirstOf\0",
         arity: 1,
     },
@@ -464,9 +472,15 @@ mod tests {
 
     #[test]
     fn api_manifest_tracks_compatibility_surface() {
-        assert_eq!(GLOBAL_API.len(), 58);
+        assert_eq!(GLOBAL_API.len(), 60);
         assert_eq!(GLOBAL_API[0].name, b"print\0");
         assert!(ue4ssl_js_global_api_is_function(0));
+        assert!(GLOBAL_API
+            .iter()
+            .any(|entry| entry.name == b"FindFirstInstanceOfClass\0"));
+        assert!(GLOBAL_API
+            .iter()
+            .any(|entry| entry.name == b"FindAllInstancesOfClass\0"));
         assert!(GLOBAL_API
             .iter()
             .any(|entry| entry.name == b"__umgConstructWidget\0"));

@@ -82,6 +82,8 @@ namespace RC::JSScript
     // ============================================
 
     JSValue js_print(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    JSValue js_find_first_instance_of_class(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+    JSValue js_find_all_instances_of_class(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     JSValue js_find_first_of(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     JSValue js_find_all_of(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
     JSValue js_find_all_actors_with_interface(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);

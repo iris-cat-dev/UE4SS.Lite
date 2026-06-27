@@ -630,6 +630,10 @@ namespace RC
         config.bEnableCache = settings_manager.General.UseCache;
         config.SecondsToScanBeforeGivingUp = settings_manager.General.SecondsToScanBeforeGivingUp;
         config.bUseUObjectArrayCache = settings_manager.General.UseUObjectArrayCache;
+        config.bHookStaticConstructObjectObjectCache = settings_manager.Hooks.HookStaticConstructObjectObjectCache;
+        config.bUseNativeStaticFindObjectFast = settings_manager.ObjectSearch.UseNativeStaticFindObjectFast;
+        config.bUseNativeClassEnumeration = settings_manager.ObjectSearch.UseNativeClassEnumeration;
+        config.bCompareNativeSearchResults = settings_manager.ObjectSearch.CompareNativeSearchResults;
 
         const auto unreal_config_plan = Compat::HostApi::plan_unreal_config(
                 settings_manager.Threads.SigScannerNumThreads,

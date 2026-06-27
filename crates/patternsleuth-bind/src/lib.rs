@@ -16,6 +16,7 @@ use patternsleuth::resolvers::{
         guobject_array::GUObjectArray,
         kismet::GNatives,
         static_construct_object::StaticConstructObjectInternal,
+        static_find_object::StaticFindObjectFast,
         ConsoleManagerSingleton,
     },
     ResolveError,
@@ -38,6 +39,7 @@ impl_collector! {
         gnatives: GNatives,
         console_manager_singleton: ConsoleManagerSingleton,
         gameengine_tick: UGameEngineTick,
+        static_find_object_fast: StaticFindObjectFast,
     }
 }
 
@@ -161,6 +163,11 @@ pub fn ps_scan_internal(ctx: &PsCtx, results: &mut PsScanResults) -> Result<(), 
         "ConsoleManager.lua"
     );
     handle!(gameengine_tick, "GameEngine::Tick", "GameEngine_Tick.lua");
+    handle!(
+        static_find_object_fast,
+        "StaticFindObjectFast",
+        "StaticFindObjectFast.lua"
+    );
 
     if errors.0.is_empty() {
         Ok(())

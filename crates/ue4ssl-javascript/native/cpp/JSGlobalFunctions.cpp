@@ -1,5 +1,6 @@
 #include "JSInternal.hpp"
 
+#include <atomic>
 #include <unordered_set>
 
 #include <DynamicOutput/DynamicOutput.hpp>
@@ -52,29 +53,29 @@ namespace RC::JSScript
 
     static constexpr const char* last_object_search_failure_property = "__UE4SSL_LastObjectSearchFailure__";
 
-    static bool safe_find_first_of(const std::wstring& class_name, Unreal::UObject*& out)
+    static bool safe_find_first_instance_of_class(const std::wstring& class_name, Unreal::UObject*& out, const wchar_t* operation)
     {
         out = nullptr;
         __try
         {
-            out = Unreal::UObjectGlobals::FindFirstOf(class_name);
+            out = Unreal::UObjectGlobals::FindFirstInstanceOfClass(class_name);
             return true;
         }
-        __except (Seh::FilterAndLog(L"JavaScript", L"FindFirstOf", GetExceptionCode(), GetExceptionInformation()))
+        __except (Seh::FilterAndLog(L"JavaScript", operation, GetExceptionCode(), GetExceptionInformation()))
         {
             out = nullptr;
             return false;
         }
     }
 
-    static bool safe_find_all_of(const std::wstring& class_name, std::vector<Unreal::UObject*>& out)
+    static bool safe_find_all_instances_of_class(const std::wstring& class_name, std::vector<Unreal::UObject*>& out, const wchar_t* operation)
     {
         __try
         {
-            Unreal::UObjectGlobals::FindAllOf(class_name, out);
+            Unreal::UObjectGlobals::FindAllInstancesOfClass(class_name, out);
             return true;
         }
-        __except (Seh::FilterAndLog(L"JavaScript", L"FindAllOf", GetExceptionCode(), GetExceptionInformation()))
+        __except (Seh::FilterAndLog(L"JavaScript", operation, GetExceptionCode(), GetExceptionInformation()))
         {
             return false;
         }
@@ -651,10 +652,10 @@ namespace RC::JSScript
     // UObject lookup functions (with SEH)
     // ============================================
 
-    JSValue js_find_first_of(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    static JSValue js_find_first_instance_of_class_impl(JSContext* ctx, int argc, JSValueConst* argv, const char* api_name, const wchar_t* seh_context)
     {
         if (argc < 1)
-            return JS_ThrowTypeError(ctx, "FindFirstOf requires a class name argument");
+            return JS_ThrowTypeError(ctx, "%s requires a class name argument", api_name);
 
         const char* class_name = JS_ToCString(ctx, argv[0]);
         if (!class_name)
@@ -666,9 +667,9 @@ namespace RC::JSScript
         try
         {
             Unreal::UObject* found_obj = nullptr;
-            if (!safe_find_first_of(wide_name, found_obj))
+            if (!safe_find_first_instance_of_class(wide_name, found_obj, seh_context))
             {
-                set_last_object_search_failure(ctx, "FindFirstOf", wide_name, Seh::GetLastSehCode());
+                set_last_object_search_failure(ctx, api_name, wide_name, Seh::GetLastSehCode());
                 return JS_NULL;
             }
             if (!found_obj) return JS_NULL;
@@ -676,21 +677,38 @@ namespace RC::JSScript
         }
         catch (const std::exception& e)
         {
-            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] FindFirstOf exception: {}\n"),
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] {} exception: {}\n"),
+                std::wstring(seh_context),
                 std::wstring(e.what(), e.what() + strlen(e.what())));
             return JS_NULL;
         }
         catch (...)
         {
-            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] FindFirstOf unknown exception\n"));
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] {} unknown exception\n"), std::wstring(seh_context));
             return JS_NULL;
         }
     }
 
-    JSValue js_find_all_of(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+    JSValue js_find_first_instance_of_class(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+    {
+        return js_find_first_instance_of_class_impl(ctx, argc, argv, "FindFirstInstanceOfClass", L"FindFirstInstanceOfClass");
+    }
+
+    JSValue js_find_first_of(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+    {
+        static std::atomic_bool warned{false};
+        bool expected{false};
+        if (warned.compare_exchange_strong(expected, true))
+        {
+            Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] FindFirstOf is deprecated; use FindFirstInstanceOfClass\n"));
+        }
+        return js_find_first_instance_of_class_impl(ctx, argc, argv, "FindFirstOf", L"FindFirstOf");
+    }
+
+    static JSValue js_find_all_instances_of_class_impl(JSContext* ctx, int argc, JSValueConst* argv, const char* api_name, const wchar_t* seh_context)
     {
         if (argc < 1)
-            return JS_ThrowTypeError(ctx, "FindAllOf requires a class name argument");
+            return JS_ThrowTypeError(ctx, "%s requires a class name argument", api_name);
 
         const char* class_name = JS_ToCString(ctx, argv[0]);
         if (!class_name)
@@ -702,9 +720,9 @@ namespace RC::JSScript
         try
         {
             std::vector<Unreal::UObject*> found_objects;
-            if (!safe_find_all_of(wide_name, found_objects))
+            if (!safe_find_all_instances_of_class(wide_name, found_objects, seh_context))
             {
-                set_last_object_search_failure(ctx, "FindAllOf", wide_name, Seh::GetLastSehCode());
+                set_last_object_search_failure(ctx, api_name, wide_name, Seh::GetLastSehCode());
                 return JS_NewArray(ctx);
             }
 
@@ -718,15 +736,32 @@ namespace RC::JSScript
         }
         catch (const std::exception& e)
         {
-            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] FindAllOf exception: {}\n"),
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] {} exception: {}\n"),
+                std::wstring(seh_context),
                 std::wstring(e.what(), e.what() + strlen(e.what())));
             return JS_NewArray(ctx);
         }
         catch (...)
         {
-            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] FindAllOf unknown exception\n"));
+            Output::send<LogLevel::Error>(STR("[UE4SSL.JavaScript] {} unknown exception\n"), std::wstring(seh_context));
             return JS_NewArray(ctx);
         }
+    }
+
+    JSValue js_find_all_instances_of_class(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+    {
+        return js_find_all_instances_of_class_impl(ctx, argc, argv, "FindAllInstancesOfClass", L"FindAllInstancesOfClass");
+    }
+
+    JSValue js_find_all_of(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+    {
+        static std::atomic_bool warned{false};
+        bool expected{false};
+        if (warned.compare_exchange_strong(expected, true))
+        {
+            Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] FindAllOf is deprecated; use FindAllInstancesOfClass\n"));
+        }
+        return js_find_all_instances_of_class_impl(ctx, argc, argv, "FindAllOf", L"FindAllOf");
     }
 
     static int seh_actor_implements_interface(Unreal::UObject* object, Unreal::UClass* interface_class)
@@ -772,7 +807,7 @@ namespace RC::JSScript
             }
 
             std::vector<Unreal::UObject*> found_actors{};
-            if (!safe_find_all_of(L"Actor", found_actors))
+            if (!safe_find_all_instances_of_class(L"Actor", found_actors, L"FindAllActorsWithInterface"))
             {
                 return JS_NewArray(ctx);
             }

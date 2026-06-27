@@ -14,6 +14,9 @@ namespace RC::Compat::RustCore
         uint8_t general_use_uobject_array_cache{};
         uint8_t general_enable_slow_cpp_mod_update_guard{};
         int64_t general_slow_cpp_mod_update_threshold_ms{};
+        uint8_t object_search_use_native_static_find_object_fast{};
+        uint8_t object_search_use_native_class_enumeration{};
+        uint8_t object_search_compare_native_search_results{};
         int64_t engine_version_override_major_version{};
         int64_t engine_version_override_minor_version{};
         uint8_t debug_simple_console_enabled{};
@@ -36,6 +39,7 @@ namespace RC::Compat::RustCore
         uint8_t hooks_hook_aactor_tick{};
         uint8_t hooks_hook_process_event{};
         uint8_t hooks_hook_ufunction_bind{};
+        uint8_t hooks_hook_static_construct_object_object_cache{};
         int64_t hooks_fexec_vtable_offset_in_local_player{};
     };
 }

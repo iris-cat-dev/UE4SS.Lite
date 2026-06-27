@@ -183,6 +183,17 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
         ],
     },
     NativeGroup {
+        name: "ue4ssl_paksync_native",
+
+        strategy: NativeStrategy::BuildRsToolchain,
+
+        legacy_targets: &["UE4SSL.PakSync"],
+
+        source_roots: &["crates/ue4ssl-paksync/native/cpp"],
+
+        include_roots: &["crates/ue4ssl-paksync/native/include"],
+    },
+    NativeGroup {
         name: "ue4ssl_proxy_native",
 
         strategy: NativeStrategy::BuildRsToolchain,
@@ -238,12 +249,29 @@ pub const SCRIPT_ENGINE_ARTIFACTS: &[ArtifactSpec] = &[
     },
 ];
 
+pub const MOD_ARTIFACTS: &[ArtifactSpec] = &[ArtifactSpec {
+    package_name: "ue4ssl-paksync",
+
+    cargo_target_stem: "ue4ssl_paksync",
+
+    binary_name: "UE4SSL.PakSync",
+
+    kind: PackageKind::Mod,
+
+    mod_directory_name: Some("UE4SSL.PakSync"),
+
+    extra_stage_roots: &["crates/ue4ssl-paksync/config"],
+}];
+
 pub fn artifact_by_package(package_name: &str) -> Option<&'static ArtifactSpec> {
     default_artifacts().find(|artifact| artifact.package_name == package_name)
 }
 
 pub fn default_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    CORE_ARTIFACTS.iter().chain(SCRIPT_ENGINE_ARTIFACTS.iter())
+    CORE_ARTIFACTS
+        .iter()
+        .chain(SCRIPT_ENGINE_ARTIFACTS.iter())
+        .chain(MOD_ARTIFACTS.iter())
 }
 
 pub fn core_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
@@ -251,7 +279,7 @@ pub fn core_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
 }
 
 pub fn runtime_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    SCRIPT_ENGINE_ARTIFACTS.iter()
+    SCRIPT_ENGINE_ARTIFACTS.iter().chain(MOD_ARTIFACTS.iter())
 }
 
 pub fn cargo_dll_name(target_stem: &str) -> String {

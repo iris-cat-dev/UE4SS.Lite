@@ -2,6 +2,10 @@
 #include <Unreal/Searcher/ObjectSearcherProfiler.hpp>
 #include <Unreal/CoreUObject/UObject/Class.hpp>
 #include <Unreal/UObjectArray.hpp>
+#include <Unreal/UnrealInitializer.hpp>
+#include <DynamicOutput/DynamicOutput.hpp>
+
+#include <atomic>
 
 namespace RC::Unreal
 {
@@ -57,6 +61,17 @@ namespace RC::Unreal
     {
         OBJSEARCHER_PROFILE_SEARCH_SLOW()
         (void)Pool;
+
+        if (UnrealInitializer::StaticStorage::GlobalConfig.bUseNativeClassEnumeration)
+        {
+            static std::atomic_bool bWarned{false};
+            bool bExpected{false};
+            if (bWarned.compare_exchange_strong(bExpected, true))
+            {
+                Output::send<LogLevel::Warning>(
+                        STR("[UE4SS.ObjectSearch] UseNativeClassEnumeration is enabled, but no native class enumerator is installed yet; falling back to GUObjectArray search.\n"));
+            }
+        }
 
         UObjectGlobals::ForEachUObject([&](UObject* Object, ...) {
             if (!Object || Object->IsUnreachable()) { return LoopAction::Continue; }

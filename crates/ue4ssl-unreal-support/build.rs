@@ -37,6 +37,7 @@ fn main() {
             unreal_src.clone(),
             unreal_root.join("include"),
             unreal_root.join("generated_include"),
+            workspace_root.join("crates/ue4ssl-object-searcher/include"),
             workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
             workspace_root.join("crates/ue4ssl-hook/include"),
         ],
@@ -46,6 +47,7 @@ fn main() {
         unreal_src.clone(),
         unreal_root.join("include"),
         unreal_root.join("generated_include"),
+        workspace_root.join("crates/ue4ssl-object-searcher/include"),
         workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ] {

@@ -13,6 +13,11 @@ bUseUObjectArrayCache = true
 EnableSlowCppModUpdateGuard = true
 SlowCppModUpdateThresholdMs = 4000
 
+[ObjectSearch]
+UseNativeStaticFindObjectFast = 0
+UseNativeClassEnumeration = 0
+CompareNativeSearchResults = 0
+
 [EngineVersionOverride]
 MajorVersion = -1
 MinorVersion = -1
@@ -30,13 +35,14 @@ MaxMemoryUsageDuringAssetLoading = 80
 [Hooks]
 HookProcessInternal = 1
 HookProcessLocalScriptFunction = 1
-HookInitGameState = 1
+HookInitGameState = 0
 HookCallFunctionByNameWithArguments = 1
 HookBeginPlay  = 1
 HookLocalPlayerExec = 1
-HookEngineTick = 1
+HookEngineTick = 0
 HookProcessEvent = 1
 HookUFunctionBind = 1
+HookStaticConstructObjectObjectCache = 1
 FExecVTableOffsetInLocalPlayer = 0x28
 
 [CrashDump]
@@ -55,6 +61,9 @@ pub struct SettingsSnapshot {
     pub general_use_uobject_array_cache: u8,
     pub general_enable_slow_cpp_mod_update_guard: u8,
     pub general_slow_cpp_mod_update_threshold_ms: i64,
+    pub object_search_use_native_static_find_object_fast: u8,
+    pub object_search_use_native_class_enumeration: u8,
+    pub object_search_compare_native_search_results: u8,
     pub engine_version_override_major_version: i64,
     pub engine_version_override_minor_version: i64,
     pub debug_simple_console_enabled: u8,
@@ -77,6 +86,7 @@ pub struct SettingsSnapshot {
     pub hooks_hook_aactor_tick: u8,
     pub hooks_hook_process_event: u8,
     pub hooks_hook_ufunction_bind: u8,
+    pub hooks_hook_static_construct_object_object_cache: u8,
     pub hooks_fexec_vtable_offset_in_local_player: i64,
 }
 
@@ -91,6 +101,9 @@ impl Default for SettingsSnapshot {
             general_use_uobject_array_cache: 1,
             general_enable_slow_cpp_mod_update_guard: 1,
             general_slow_cpp_mod_update_threshold_ms: 4000,
+            object_search_use_native_static_find_object_fast: 0,
+            object_search_use_native_class_enumeration: 0,
+            object_search_compare_native_search_results: 0,
             engine_version_override_major_version: -1,
             engine_version_override_minor_version: -1,
             debug_simple_console_enabled: 0,
@@ -104,15 +117,16 @@ impl Default for SettingsSnapshot {
             memory_max_memory_usage_during_asset_loading: 85,
             hooks_hook_process_internal: 1,
             hooks_hook_process_local_script_function: 0,
-            hooks_hook_init_game_state: 1,
+            hooks_hook_init_game_state: 0,
             hooks_hook_load_map: 1,
             hooks_hook_call_function_by_name_with_arguments: 1,
             hooks_hook_begin_play: 1,
             hooks_hook_local_player_exec: 1,
-            hooks_hook_engine_tick: 1,
+            hooks_hook_engine_tick: 0,
             hooks_hook_aactor_tick: 0,
             hooks_hook_process_event: 1,
             hooks_hook_ufunction_bind: 1,
+            hooks_hook_static_construct_object_object_cache: 1,
             hooks_fexec_vtable_offset_in_local_player: 0x28,
         }
     }
@@ -165,6 +179,25 @@ pub fn load_settings(path: &Path) -> SettingsSnapshot {
         "General",
         "SlowCppModUpdateThresholdMs",
         &mut snapshot.general_slow_cpp_mod_update_threshold_ms,
+    );
+
+    apply_bool(
+        &ini,
+        "ObjectSearch",
+        "UseNativeStaticFindObjectFast",
+        &mut snapshot.object_search_use_native_static_find_object_fast,
+    );
+    apply_bool(
+        &ini,
+        "ObjectSearch",
+        "UseNativeClassEnumeration",
+        &mut snapshot.object_search_use_native_class_enumeration,
+    );
+    apply_bool(
+        &ini,
+        "ObjectSearch",
+        "CompareNativeSearchResults",
+        &mut snapshot.object_search_compare_native_search_results,
     );
 
     apply_i64(
@@ -303,6 +336,12 @@ pub fn load_settings(path: &Path) -> SettingsSnapshot {
         "HookUFunctionBind",
         &mut snapshot.hooks_hook_ufunction_bind,
     );
+    apply_bool(
+        &ini,
+        "Hooks",
+        "HookStaticConstructObjectObjectCache",
+        &mut snapshot.hooks_hook_static_construct_object_object_cache,
+    );
     apply_i64(
         &ini,
         "Hooks",
@@ -355,5 +394,9 @@ mod tests {
 
         assert_eq!(snapshot.debug_simple_console_enabled, 0);
         assert_eq!(snapshot.memory_max_memory_usage_during_asset_loading, 80);
+        assert_eq!(snapshot.object_search_use_native_static_find_object_fast, 0);
+        assert_eq!(snapshot.object_search_use_native_class_enumeration, 0);
+        assert_eq!(snapshot.object_search_compare_native_search_results, 0);
+        assert_eq!(snapshot.hooks_hook_static_construct_object_object_cache, 1);
     }
 }

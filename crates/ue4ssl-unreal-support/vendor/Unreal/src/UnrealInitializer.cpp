@@ -203,22 +203,29 @@ namespace RC::Unreal::UnrealInitializer
         Hook::StartCallbackGarbageCollector();
     #endif
 
-        Hook::RegisterStaticConstructObjectPostCallback([](auto& data, auto& params) {
-            if (UnrealInitializer::StaticStorage::bIsInitialized) {
-                UObject* object = data.GetCurrentResolvedReturnValue();
-                if(!object)
-                {
-                    Output::send<LogLevel::Warning>(STR("[{}.{}.{}] StaticConstructObject is set to return nullptr, not adding to ObjectSearcherPool!"),
-                                                    STR("UE4SS"), STR("StaticConstructObject"), STR("ObjectSearcherPoolHook"));
-                    return;
+        if (UnrealConfig.bHookStaticConstructObjectObjectCache)
+        {
+            Hook::RegisterStaticConstructObjectPostCallback([](auto& data, auto& params) {
+                if (UnrealInitializer::StaticStorage::bIsInitialized) {
+                    UObject* object = data.GetCurrentResolvedReturnValue();
+                    if(!object)
+                    {
+                        Output::send<LogLevel::Warning>(STR("[{}.{}.{}] StaticConstructObject is set to return nullptr, not adding to ObjectSearcherPool!"),
+                                                        STR("UE4SS"), STR("StaticConstructObject"), STR("ObjectSearcherPoolHook"));
+                        return;
+                    }
+                    if (object->IsA<AActor>())
+                    {
+                        std::lock_guard<std::mutex> ActorInstPoolLock(ObjectSearcherPool<AActor, AnySuperStruct>::PoolMutex);
+                        ObjectSearcherPool<AActor, AnySuperStruct>::Add(object->GetObjectItem());
+                    }
                 }
-                if (object->IsA<AActor>())
-                {
-                    std::lock_guard<std::mutex> ActorInstPoolLock(ObjectSearcherPool<AActor, AnySuperStruct>::PoolMutex);
-                    ObjectSearcherPool<AActor, AnySuperStruct>::Add(object->GetObjectItem());
-                }
-            }
-        }, {false, true, STR("UE4SS"), STR("ObjectSearcherPoolHook")});
+            }, {false, true, STR("UE4SS"), STR("ObjectSearcherPoolHook")});
+        }
+        else
+        {
+            Output::send<LogLevel::Verbose>(STR("[UE4SS.ObjectSearch] StaticConstructObject ObjectSearcherPool hook disabled by config.\n"));
+        }
     }
 
     using PsScanConfig = RC::Compat::Scan::PsScanConfig;
@@ -248,6 +255,7 @@ namespace RC::Unreal::UnrealInitializer
         config.ufunction_bind = UnrealConfig.bHookUFunctionBind;
         config.gnatives = !UnrealConfig.ScanOverrides.gnatives;
         config.gameengine_tick = UnrealConfig.bHookEngineTick && !UnrealConfig.ScanOverrides.gameengine_tick;
+        config.static_find_object_fast = UnrealConfig.bUseNativeStaticFindObjectFast && !UnrealConfig.ScanOverrides.static_find_object;
         // These resolver outputs are available through the Rust binder, but are not currently
         // consumed by the C++ initialization path. Keep custom overrides on the legacy path.
         config.ftext_fstring = 0;
@@ -375,6 +383,10 @@ namespace RC::Unreal::UnrealInitializer
             if (ctx.config.static_construct_object_internal)
             {
                 UObjectGlobals::SetupStaticConstructObjectInternalAddress(reinterpret_cast<void*>(results.static_construct_object_internal));
+            }
+            if (ctx.config.static_find_object_fast)
+            {
+                UObjectGlobals::SetupStaticFindObjectFastAddress(reinterpret_cast<void*>(results.static_find_object_fast));
             }
             if (ctx.config.gameengine_tick)
             {
@@ -556,7 +568,7 @@ namespace RC::Unreal::UnrealInitializer
         }
 
         auto GetInstanceFromClass = [](const TCHAR* ClassName, const TCHAR* FallbackCDO) {
-            auto Instance = UObjectGlobals::FindFirstOf(ClassName);
+            auto Instance = UObjectGlobals::FindFirstInstanceOfClass(ClassName);
             if (!Instance)
             {
                 Instance = UObjectGlobals::StaticFindObject_InternalSlow(nullptr, nullptr, FallbackCDO);
