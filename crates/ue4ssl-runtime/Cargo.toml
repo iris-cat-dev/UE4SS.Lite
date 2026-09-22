@@ -6,3 +6,4 @@ publish.workspace = true
 
 [dependencies]
 ue4ssl_abi.workspace = true
+parking_lot = "0.12"

@@ -10,6 +10,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+ue4ssl_abi.workspace = true
 ue4ssl-runtime.workspace = true
 ue4ssl-hook.workspace = true
 patternsleuth_bind.workspace = true

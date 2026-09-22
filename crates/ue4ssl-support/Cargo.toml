@@ -10,6 +10,9 @@ links = "ue4ssl_support"
 path = "src/lib.rs"
 crate-type = ["rlib", "staticlib"]
 
+[dependencies]
+ue4ssl_abi.workspace = true
+
 [build-dependencies]
 cc.workspace = true
 ue4ssl_abi.workspace = true

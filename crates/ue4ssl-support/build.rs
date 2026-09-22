@@ -26,11 +26,16 @@ fn main() {
     let profile = BuildProfile::from_env();
     let generated = generate_abi_headers(&out_dir).expect("failed to generate ABI headers");
 
-    build_native_support(&workspace_root, &out_dir, profile);
+    build_native_support(&workspace_root, &out_dir, profile, &generated);
     build_ue4ssl_cpp_support(&workspace_root, &out_dir, profile, &generated);
 }
 
-fn build_native_support(workspace_root: &Path, out_dir: &Path, profile: BuildProfile) {
+fn build_native_support(
+    workspace_root: &Path,
+    out_dir: &Path,
+    profile: BuildProfile,
+    generated: &GeneratedAbiIncludeRoots,
+) {
     let sources = [
         workspace_root.join("crates/ue4ssl-native-support/vendor/Input/src/Handler.cpp"),
         workspace_root
@@ -77,6 +82,7 @@ fn build_native_support(workspace_root: &Path, out_dir: &Path, profile: BuildPro
     build.static_crt(false);
     build.debug(profile.is_debug());
     build.flag("-MD");
+    build.include(&generated.ue4ssl_include);
 
     for include in includes {
         build.include(include);

@@ -16,15 +16,14 @@ namespace RC
     class CppMod : public Mod
     {
       private:
-        std::filesystem::path m_dlls_path;
-        RC::Compat::RustCore::CppModHandle* m_handle = nullptr;
+        // Borrowed SDK view. Rust owns the collection, lifecycle and loaded module.
+        uint64_t m_id{};
 
       public:
-        CppMod(UE4SSProgram&, StringType&& mod_name, StringType&& mod_path);
-        CppMod(UE4SSProgram&, StringType&& mod_name, StringType&& mod_path, StringType&& dll_name);
+        CppMod(UE4SSProgram&, uint64_t id, StringType&& mod_name, StringType&& mod_path);
         CppMod(CppMod&) = delete;
         CppMod(CppMod&&) = delete;
-        ~CppMod() override;
+        ~CppMod() override = default;
 
       public:
         auto set_installable(bool) -> void override;

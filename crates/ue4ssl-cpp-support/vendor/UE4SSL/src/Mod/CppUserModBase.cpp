@@ -17,45 +17,19 @@ namespace RC
 
     CppUserModBase::~CppUserModBase()
     {
-
-        auto& key_events = UE4SSProgram::get_program().m_input_handler.get_events();
-        std::erase_if(key_events, [&](Input::KeySet& input_event) -> bool {
-            bool were_all_events_registered_from_this_mod = true;
-            for (auto& [key, vector_of_key_data] : input_event.key_data)
-            {
-                std::erase_if(vector_of_key_data, [&](Input::KeyData& key_data) -> bool {
-                    // custom_data == 1: Bind came from Lua, and custom_data2 is nullptr.
-                    // custom_data == 2: Bind came from C++, and custom_data2 is a pointer to KeyDownEventData. Must free it.
-                    auto event_data = static_cast<KeyDownEventData*>(key_data.custom_data2);
-                    if (key_data.custom_data == static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Cpp) && event_data && event_data->mod == this)
-                    {
-                        delete event_data;
-                        return true;
-                    }
-                    else
-                    {
-                        were_all_events_registered_from_this_mod = false;
-                        return false;
-                    }
-                });
-            }
-
-            return were_all_events_registered_from_this_mod;
-        });
+        UE4SSProgram::get_program().unregister_input_owner(reinterpret_cast<uintptr_t>(this));
     }
 
-    auto CppUserModBase::register_keydown_event(Input::Key key, const Input::EventCallbackCallable& callback, uint8_t custom_data) -> void
+    auto CppUserModBase::register_keydown_event(Input::Key key, const Input::EventCallbackCallable& callback, [[maybe_unused]] uint8_t custom_data) -> void
     {
-        UE4SSProgram::get_program().register_keydown_event(
-                key, callback, static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Cpp), new KeyDownEventData{custom_data, this});
+        UE4SSProgram::get_program().register_keydown_event_owned(key, callback, static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Cpp), reinterpret_cast<uintptr_t>(this));
     }
 
     auto CppUserModBase::register_keydown_event(Input::Key key,
                                                 const Input::Handler::ModifierKeyArray& callback,
                                                 const Input::EventCallbackCallable& modifier_keys,
-                                                uint8_t custom_data) -> void
+                                                [[maybe_unused]] uint8_t custom_data) -> void
     {
-        UE4SSProgram::get_program().register_keydown_event(
-                key, callback, modifier_keys, static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Cpp), new KeyDownEventData{custom_data, this});
+        UE4SSProgram::get_program().register_keydown_event_owned(key, callback, modifier_keys, static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Cpp), reinterpret_cast<uintptr_t>(this));
     }
 } // namespace RC

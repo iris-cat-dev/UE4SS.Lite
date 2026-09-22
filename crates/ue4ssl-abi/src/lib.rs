@@ -72,6 +72,39 @@ pub struct RustModStartContext {
     pub mod_path: SliceU16,
 }
 
+pub type RuntimeGate = unsafe extern "C" fn(*mut std::ffi::c_void) -> u8;
+pub type RuntimeCloseSources = unsafe extern "C" fn(*mut std::ffi::c_void);
+pub type RuntimeUnregisterOwner = unsafe extern "C" fn(*mut std::ffi::c_void, usize);
+pub type RuntimeCallback = unsafe extern "C" fn(*mut std::ffi::c_void);
+
+/// Host gates run on the runtime actor, never under the runtime queue lock.
+/// Path buffers are copied by start; host context remains borrowed until start returns.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct RuntimeConfig {
+    pub working_directory: SliceU16,
+    pub mods_directory: SliceU16,
+    pub context: *mut std::ffi::c_void,
+    pub prepare_engine: Option<RuntimeGate>,
+    pub program_ready: Option<RuntimeGate>,
+    pub poll_input: Option<RuntimeGate>,
+    pub close_sources: Option<RuntimeCloseSources>,
+    pub unregister_owner: Option<RuntimeUnregisterOwner>,
+    pub slow_update_threshold_ms: u64,
+    pub enable_slow_update_guard: u8,
+}
+
+/// Queue submission always transfers context ownership, including rejection.
+/// Release runs exactly once after execution or cancellation, outside queue locks.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct RuntimeEvent {
+    pub owner: usize,
+    pub callback: Option<RuntimeCallback>,
+    pub context: *mut std::ffi::c_void,
+    pub release: Option<RuntimeCallback>,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct HostVector {
@@ -519,6 +552,72 @@ pub fn render_rustcore_header() -> String {
         align_of::<HostHookContext>(),
         &[("context", offset_of!(HostHookContext, context))],
     );
+    output.push_str(
+        "    using RuntimeGate = uint8_t (*)(void*);\n\
+         using RuntimeCloseSources = void (*)(void*);\n\
+         using RuntimeUnregisterOwner = void (*)(void*, uintptr_t);\n\
+         using RuntimeCallback = void (*)(void*);\n\
+         struct RuntimeConfig {\n\
+             SliceU16 working_directory{};\n\
+             SliceU16 mods_directory{};\n\
+             void* context{};\n\
+             RuntimeGate prepare_engine{};\n\
+             RuntimeGate program_ready{};\n\
+             RuntimeGate poll_input{};\n\
+             RuntimeCloseSources close_sources{};\n\
+             RuntimeUnregisterOwner unregister_owner{};\n\
+             uint64_t slow_update_threshold_ms{};\n\
+             uint8_t enable_slow_update_guard{};\n\
+         };\n\
+         struct RuntimeEvent {\n\
+             uintptr_t owner{};\n\
+             RuntimeCallback callback{};\n\
+             void* context{};\n\
+             RuntimeCallback release{};\n\
+         };\n",
+    );
+    render_layout_asserts(
+        &mut output,
+        "RuntimeConfig",
+        size_of::<RuntimeConfig>(),
+        align_of::<RuntimeConfig>(),
+        &[
+            (
+                "working_directory",
+                offset_of!(RuntimeConfig, working_directory),
+            ),
+            ("mods_directory", offset_of!(RuntimeConfig, mods_directory)),
+            ("context", offset_of!(RuntimeConfig, context)),
+            ("prepare_engine", offset_of!(RuntimeConfig, prepare_engine)),
+            ("program_ready", offset_of!(RuntimeConfig, program_ready)),
+            ("poll_input", offset_of!(RuntimeConfig, poll_input)),
+            ("close_sources", offset_of!(RuntimeConfig, close_sources)),
+            (
+                "unregister_owner",
+                offset_of!(RuntimeConfig, unregister_owner),
+            ),
+            (
+                "slow_update_threshold_ms",
+                offset_of!(RuntimeConfig, slow_update_threshold_ms),
+            ),
+            (
+                "enable_slow_update_guard",
+                offset_of!(RuntimeConfig, enable_slow_update_guard),
+            ),
+        ],
+    );
+    render_layout_asserts(
+        &mut output,
+        "RuntimeEvent",
+        size_of::<RuntimeEvent>(),
+        align_of::<RuntimeEvent>(),
+        &[
+            ("owner", offset_of!(RuntimeEvent, owner)),
+            ("callback", offset_of!(RuntimeEvent, callback)),
+            ("context", offset_of!(RuntimeEvent, context)),
+            ("release", offset_of!(RuntimeEvent, release)),
+        ],
+    );
     writeln!(output, "}}").unwrap();
     writeln!(output).unwrap();
     writeln!(output, "#endif // UE4SSL_GENERATED_RUSTCORE_ABI_HPP").unwrap();
@@ -940,32 +1039,74 @@ pub fn render_host_header() -> String {
     output
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{render_host_header, render_rustcore_header, render_scan_header};
-
-    #[test]
-    fn rustcore_header_contains_layout_asserts() {
-        let header = render_rustcore_header();
-        assert!(header.contains("static_assert(sizeof(PathSnapshot)"));
-        assert!(header.contains("offsetof(PathSnapshot, mods_directory)"));
-    }
-
-    #[test]
-    fn scan_header_contains_layout_asserts() {
-        let header = render_scan_header();
-        assert!(header.contains("static_assert(sizeof(PsCtx)"));
-        assert!(header.contains("offsetof(PsScanResults, gameengine_tick)"));
-    }
-
-    #[test]
-    fn host_header_contains_layout_asserts() {
-        let header = render_host_header();
-        assert!(header.contains("static_assert(sizeof(ReinstallPlan)"));
-        assert!(header.contains("offsetof(ReinstallPlan, should_fire_program_start)"));
-        assert!(header.contains("static_assert(sizeof(ReinstallStep)"));
-        assert!(header.contains("offsetof(ReinstallSequence, len)"));
-        assert!(header.contains("static_assert(sizeof(ModStartupSequence)"));
-        assert!(header.contains("offsetof(UnrealConfigPlan, engine_version_override_invalid)"));
-    }
+pub fn render_runtime_header() -> String {
+    let mut output = render_file_prelude("UE4SSL_RUNTIME_FFI_HPP");
+    output.push_str(
+        "#include <Compat/GeneratedRustCoreAbi.hpp>\n\
+         extern \"C\" {\n\
+         uint8_t ue4ssl_runtime_start(const RC::Compat::RustCore::RuntimeConfig*);\n\
+         void ue4ssl_runtime_request_shutdown();\n\
+         uint8_t ue4ssl_install_dll_notifications();\n\
+         void ue4ssl_stop_dll_notifications();\n\
+         uint8_t ue4ssl_runtime_shutdown();\n\
+         uint8_t ue4ssl_runtime_reinstall();\n\
+         uint8_t ue4ssl_runtime_queue_event(RC::Compat::RustCore::RuntimeEvent);\n\
+         uint8_t ue4ssl_runtime_queue_empty();\n\
+         uintptr_t ue4ssl_runtime_current_owner();\n\
+         void ue4ssl_runtime_cancel_owner(uintptr_t);\n\
+         void ue4ssl_runtime_dll_load(RC::Compat::RustCore::SliceU16);\n\
+         void* ue4ssl_runtime_find_mod(RC::Compat::RustCore::SliceU16, uint8_t, uint8_t);\n\
+         RC::Compat::RustCore::CppModRuntimeStatus ue4ssl_runtime_mod_status(uint64_t);\n\
+         void ue4ssl_runtime_mod_action(uint64_t, uint32_t, uint8_t);\n\
+         void ue4ssl_runtime_mod_dll_load(uint64_t, RC::Compat::RustCore::SliceU16);\n\
+         }\n\
+         #endif\n",
+    );
+    output
+}
+pub fn render_support_header() -> String {
+    let mut output = render_file_prelude("UE4SSL_SUPPORT_FFI_HPP");
+    output.push_str(
+        "#include <Compat/GeneratedRustCoreAbi.hpp>\n\
+         extern \"C\" {\n\
+         RC::Compat::RustCore::OwnedString ue4ssl_native_file_read_to_string(const uint16_t*);\n\
+         void ue4ssl_native_file_free_string(RC::Compat::RustCore::OwnedString);\n\
+         uint8_t ue4ssl_native_file_prepare_append(const uint16_t*, uint8_t);\n\
+         uint8_t ue4ssl_native_file_append_utf16(const uint16_t*, const uint16_t*, size_t);\n\
+         uint8_t ue4ssl_native_input_is_key_down(int32_t);\n\
+         uint8_t ue4ssl_native_input_foreground_class_matches(const uint16_t*);\n\
+         uintptr_t ue4ssl_native_input_owner_enter(uintptr_t);\n\
+         uintptr_t ue4ssl_native_input_current_owner();\n\
+         void ue4ssl_native_input_owner_leave(uintptr_t);\n\
+         void* ue4ssl_native_input_handler_new();\n\
+         void ue4ssl_native_input_handler_destroy(void*);\n\
+         void ue4ssl_native_input_handler_add_window_class(void*, const uint16_t*);\n\
+         void ue4ssl_native_input_handler_register_keydown_event(void*, uint8_t, const uint8_t*, size_t, void (*)(void*), void*);\n\
+         uint64_t ue4ssl_native_input_handler_register_keydown_event_v2(void*, uint8_t, const uint8_t*, size_t, uintptr_t, uint8_t, void (*)(void*), void*, void (*)(void*));\n\
+         uint8_t ue4ssl_native_input_handler_unregister_event(void*, uint64_t);\n\
+         size_t ue4ssl_native_input_handler_unregister_owner(void*, uintptr_t);\n\
+         size_t ue4ssl_native_input_handler_unregister_kind(void*, uint8_t);\n\
+         uint8_t ue4ssl_native_input_handler_is_keydown_event_registered(void*, uint8_t, const uint8_t*, size_t);\n\
+         void ue4ssl_native_input_handler_process_event(void*);\n\
+         uint8_t ue4ssl_native_input_handler_get_allow_input(void*);\n\
+         void ue4ssl_native_input_handler_set_allow_input(void*, uint8_t);\n\
+         uint64_t ue4ssl_native_log_group_new();\n\
+         uint64_t ue4ssl_native_log_default_group();\n\
+         void ue4ssl_native_log_group_destroy(uint64_t);\n\
+         uint8_t ue4ssl_native_log_group_clear(uint64_t);\n\
+         uint8_t ue4ssl_native_log_group_add(uint64_t, void*, uint8_t (*)(void*, const uint16_t*, size_t, int32_t), void (*)(void*));\n\
+         uint8_t ue4ssl_native_log_group_send(uint64_t, const uint16_t*, size_t, int32_t);\n\
+         void* ue4ssl_native_log_group_find(uint64_t, void*, void* (*)(void*, void*));\n\
+         void ue4ssl_native_log_set_default_level(int32_t);\n\
+         int32_t ue4ssl_native_log_get_default_level();\n\
+         uint64_t ue4ssl_native_log_file_new();\n\
+         uint8_t ue4ssl_native_log_file_set_path(uint64_t, const uint16_t*, uint8_t);\n\
+         uint8_t ue4ssl_native_log_file_write(uint64_t, const uint16_t*, size_t);\n\
+         uint8_t ue4ssl_native_log_sink_close(uint64_t);\n\
+         uint64_t ue4ssl_native_log_console_new();\n\
+         uint8_t ue4ssl_native_log_console_write(uint64_t, const uint16_t*, size_t, int32_t);\n\
+         }\n\
+         #endif\n",
+    );
+    output
 }

@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+#[cfg(windows)]
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::ptr;
@@ -12,7 +13,16 @@ pub fn slice_to_os_string(value: SliceU16) -> OsString {
     }
 
     let raw = unsafe { slice::from_raw_parts(value.data, value.len) };
-    OsString::from_wide(raw)
+    #[cfg(windows)]
+    {
+        OsString::from_wide(raw)
+    }
+    #[cfg(all(test, not(windows)))]
+    {
+        OsString::from(
+            String::from_utf16(raw).expect("non-Windows runtime tests require valid UTF-16 paths"),
+        )
+    }
 }
 
 pub fn slice_to_string_lossy(value: SliceU16) -> String {
@@ -28,8 +38,22 @@ pub fn slice_to_path_buf(value: SliceU16) -> PathBuf {
     PathBuf::from(slice_to_os_string(value))
 }
 
+#[cfg(windows)]
+pub fn os_str_to_utf16(value: &OsStr) -> Vec<u16> {
+    value.encode_wide().collect()
+}
+
+#[cfg(all(test, not(windows)))]
+pub fn os_str_to_utf16(value: &OsStr) -> Vec<u16> {
+    value
+        .to_str()
+        .expect("non-Windows runtime tests require UTF-8 paths")
+        .encode_utf16()
+        .collect()
+}
+
 pub fn os_str_to_owned_string(value: &OsStr) -> OwnedString {
-    let encoded: Vec<u16> = value.encode_wide().collect();
+    let encoded = os_str_to_utf16(value);
     vec_to_owned_string(encoded)
 }
 

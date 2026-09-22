@@ -11,3 +11,16 @@ pub fn ensure_linked() {
 
 #[used]
 static FORCE_LINK_UE4SSL: fn() = ensure_linked;
+
+#[cfg(windows)]
+mod bootstrap;
+
+#[cfg(windows)]
+mod notifications;
+
+/// Explicit resource shutdown, called outside the loader lock.
+/// IAT callbacks pin the core module until process exit; this does not physically unload it.
+#[no_mangle]
+pub extern "C" fn ue4ssl_shutdown() -> u8 {
+    ue4ssl_runtime::core::ue4ssl_runtime_shutdown()
+}

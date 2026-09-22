@@ -7,6 +7,8 @@ mod settings;
 mod state;
 mod wide;
 
+pub use state::{ue4ssl_runtime_request_shutdown, ue4ssl_runtime_shutdown};
+
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
@@ -211,14 +213,7 @@ pub extern "C" fn ue4ssl_core_ini_ordered_list_item(
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_get_program_flags() -> ProgramFlags {
-    ffi_or_default(|| {
-        let flags = state::get_program_flags();
-        ProgramFlags {
-            is_program_started: u8::from(flags.is_program_started),
-            processing_events: u8::from(flags.processing_events),
-            pause_events_processing: u8::from(flags.pause_events_processing),
-        }
-    })
+    ffi_or_default(state::get_program_flags)
 }
 
 #[no_mangle]
@@ -282,120 +277,72 @@ pub extern "C" fn ue4ssl_core_cppmod_create(
     mod_path: SliceU16,
     dll_name: SliceU16,
 ) -> *mut CppModHandle {
-    ffi_or_default(|| Box::into_raw(cpp_mod::CppModHandle::load(mod_path, dll_name)))
+    ffi_or_default(|| state::legacy_create(mod_path, dll_name))
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_destroy(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if !handle.is_null() {
-            drop(Box::from_raw(handle));
-        }
-    }));
+    state::legacy_action(handle, 5, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_status(handle: *const CppModHandle) -> CppModRuntimeStatus {
-    ffi_or_default(|| unsafe {
-        handle
-            .as_ref()
-            .map(CppModHandle::status)
-            .unwrap_or_default()
-    })
+    state::ue4ssl_runtime_mod_status(handle as usize as u64)
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_set_installable(handle: *mut CppModHandle, value: u8) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.set_installable(value != 0);
-        }
-    }));
+    state::legacy_action(handle, 1, value);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_set_installed(handle: *mut CppModHandle, value: u8) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.set_installed(value != 0);
-        }
-    }));
+    state::legacy_action(handle, 2, value);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_set_updates_disabled(handle: *mut CppModHandle, value: u8) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.set_updates_disabled(value != 0);
-        }
-    }));
+    state::legacy_action(handle, 3, value);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_start(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.start();
-        }
-    }));
+    state::legacy_action(handle, 4, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_uninstall(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.uninstall();
-        }
-    }));
+    state::legacy_action(handle, 10, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_fire_unreal_init(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.fire_unreal_init();
-        }
-    }));
+    state::legacy_action(handle, 6, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_fire_ui_init(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.fire_ui_init();
-        }
-    }));
+    state::legacy_action(handle, 7, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_fire_program_start(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.fire_program_start();
-        }
-    }));
+    state::legacy_action(handle, 8, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_fire_update(handle: *mut CppModHandle) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.fire_update();
-        }
-    }));
+    state::legacy_action(handle, 9, 0);
 }
 
 #[no_mangle]
 pub extern "C" fn ue4ssl_core_cppmod_fire_dll_load(handle: *mut CppModHandle, dll_name: SliceU16) {
-    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-        if let Some(handle) = handle.as_mut() {
-            handle.fire_dll_load(dll_name);
-        }
-    }));
+    state::legacy_dll_load(handle, dll_name);
 }
 
 #[inline(never)]
 pub fn force_link_exports() {
+    state::force_link_exports();
     let _ = ue4ssl_core_compute_base_paths as *const () as usize;
     let _ = ue4ssl_core_resolve_mods_directory as *const () as usize;
     let _ = ue4ssl_core_discover_mods as *const () as usize;

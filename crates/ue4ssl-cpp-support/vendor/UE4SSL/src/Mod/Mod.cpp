@@ -87,10 +87,6 @@ namespace RC
         return m_updates_disabled;
     }
 
-    auto Mod::should_apply_slow_update_guard() const -> bool
-    {
-        return !m_mod_name.starts_with(STR("UE4SSL.")) && !m_mod_name.starts_with(STR("UE4SS."));
-    }
 
     auto Mod::fire_update() -> void
     {

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use cc::Build;
 use common::{
-    apply_common_msvc_flags, cc_archive_path, emit_dylib_link, emit_rerun_for_tree,
-    require_paths_exist, whole_archive_flag, workspace_root_from_manifest_dir, BuildProfile,
+    cc_archive_path, emit_rerun_for_tree, require_paths_exist, whole_archive_flag,
+    workspace_root_from_manifest_dir,
 };
 
 #[derive(Clone, Debug)]
@@ -30,8 +30,9 @@ struct SectionHeader {
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
-    if target_os != "windows" || target_env != "msvc" {
-        panic!("ue4ssl-proxy currently supports only windows-msvc targets");
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    if target_os != "windows" || target_env != "msvc" || target_arch != "x86_64" {
+        panic!("ue4ssl-proxy supports only x86_64-pc-windows-msvc");
     }
 
     println!("cargo:rerun-if-env-changed=UE4SSL_PROXY_PATH");
@@ -40,7 +41,6 @@ fn main() {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("missing CARGO_MANIFEST_DIR"));
     let workspace_root = workspace_root_from_manifest_dir(&manifest_dir);
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("missing OUT_DIR"));
-    let profile = BuildProfile::from_env();
 
     let proxy_src = workspace_root
         .join("crates")
@@ -56,6 +56,11 @@ fn main() {
     println!("cargo:rerun-if-changed={}", proxy_path.display());
 
     let exports = parse_exports(&proxy_path);
+    assert!(
+        !exports.is_empty(),
+        "proxy source DLL has no exports: {}",
+        proxy_path.display()
+    );
     let generated_dir = out_dir.join("generated_proxy");
     fs::create_dir_all(&generated_dir)
         .unwrap_or_else(|err| panic!("failed to create {}: {err}", generated_dir.display()));
@@ -73,35 +78,22 @@ fn main() {
 
     let def_path = generated_dir.join("proxy.def");
     let asm_path = generated_dir.join("proxy.asm");
-    let cpp_path = generated_dir.join("dllmain.cpp");
+    let rust_path = generated_dir.join("exports.rs");
 
     fs::write(&def_path, render_def_file(&dll_stem, &exports))
         .unwrap_or_else(|err| panic!("failed to write {}: {err}", def_path.display()));
     fs::write(&asm_path, render_asm_file(&exports))
         .unwrap_or_else(|err| panic!("failed to write {}: {err}", asm_path.display()));
-    fs::write(&cpp_path, render_cpp_file(&dll_name, &exports))
-        .unwrap_or_else(|err| panic!("failed to write {}: {err}", cpp_path.display()));
+    fs::write(&rust_path, render_rust_file(&dll_name, &exports))
+        .unwrap_or_else(|err| panic!("failed to write {}: {err}", rust_path.display()));
 
-    compile_cpp_archive(&cpp_path, profile);
     compile_asm_archive(&asm_path);
 
-    emit_dylib_link("user32");
     println!("cargo:rustc-link-arg-cdylib=/DEF:{}", def_path.display());
-    println!(
-        "cargo:rustc-link-arg-cdylib={}",
-        whole_archive_flag(&cc_archive_path(&out_dir, "ue4ssl_proxy_cpp"))
-    );
     println!(
         "cargo:rustc-link-arg-cdylib={}",
         whole_archive_flag(&cc_archive_path(&out_dir, "ue4ssl_proxy_asm"))
     );
-}
-
-fn compile_cpp_archive(cpp_path: &Path, profile: BuildProfile) {
-    let mut build = Build::new();
-    apply_common_msvc_flags(&mut build, profile, true, "/std:c++23preview");
-    build.file(cpp_path);
-    build.compile("ue4ssl_proxy_cpp");
 }
 
 fn compile_asm_archive(asm_path: &Path) {
@@ -117,6 +109,12 @@ fn parse_exports(path: &Path) -> Vec<ExportFunction> {
     if bytes.get(pe_offset..pe_offset + 4) != Some(b"PE\0\0".as_slice()) {
         panic!("{} is not a PE image", path.display());
     }
+    assert_eq!(
+        read_u16(&bytes, pe_offset + 4),
+        0x8664,
+        "proxy source DLL must be an AMD64 PE image: {}",
+        path.display()
+    );
 
     let number_of_sections = read_u16(&bytes, pe_offset + 6) as usize;
     let optional_header_size = read_u16(&bytes, pe_offset + 20) as usize;
@@ -239,128 +237,44 @@ fn render_asm_file(exports: &[ExportFunction]) -> String {
     out
 }
 
-fn render_cpp_file(dll_name: &str, exports: &[ExportFunction]) -> String {
-    let dll_name = dll_name.replace('\\', "\\\\").replace('"', "\\\"");
-    format!(
-        r#"#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <string>
-
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-
-namespace fs = std::filesystem;
-
-HMODULE SOriginalDll = nullptr;
-extern "C" uintptr_t mProcs[{export_count}] = {{0}};
-
-void setup_functions()
-{{
-{setup_lines}}}
-
-void load_original_dll()
-{{
-    wchar_t path[MAX_PATH];
-    GetSystemDirectoryW(path, MAX_PATH);
-    std::wstring dll_path = std::wstring(path) + L"\\{dll_name}";
-    SOriginalDll = LoadLibraryW(dll_path.c_str());
-    if (!SOriginalDll)
-    {{
-        MessageBoxW(nullptr, L"Failed to load proxy DLL", L"UE4SS Error", MB_OK | MB_ICONERROR);
-        ExitProcess(0);
-    }}
-}}
-
-bool is_absolute_path(const std::string& path)
-{{
-    return fs::path(path).is_absolute();
-}}
-
-HMODULE load_ue4ss_dll(HMODULE module_handle)
-{{
-    HMODULE hModule = nullptr;
-    wchar_t moduleFilenameBuffer[1024]{{'\0'}};
-    GetModuleFileNameW(module_handle, moduleFilenameBuffer, sizeof(moduleFilenameBuffer) / sizeof(wchar_t));
-    const auto currentPath = fs::path(moduleFilenameBuffer).parent_path();
-    const fs::path ue4ssPath = currentPath / "ue4ss" / "UE4SSL.dll";
-
-    const fs::path overrideFilePath = currentPath / "override.txt";
-    if (fs::exists(overrideFilePath))
-    {{
-        std::ifstream overrideFile(overrideFilePath);
-        std::string overridePath;
-        if (std::getline(overrideFile, overridePath))
-        {{
-            fs::path ue4ssOverridePath = overridePath;
-            if (!is_absolute_path(overridePath))
-            {{
-                ue4ssOverridePath = currentPath / overridePath;
-            }}
-
-            ue4ssOverridePath = ue4ssOverridePath / "UE4SS.dll";
-            hModule = LoadLibraryW(ue4ssOverridePath.c_str());
-            if (hModule)
-            {{
-                return hModule;
-            }}
-        }}
-    }}
-
-    hModule = LoadLibraryW(ue4ssPath.c_str());
-    if (!hModule)
-    {{
-        hModule = LoadLibraryW(L"UE4SSL.dll");
-    }}
-
-    return hModule;
-}}
-
-BOOL WINAPI DllMain(HMODULE hInstDll, DWORD fdwReason, LPVOID)
-{{
-    if (fdwReason == DLL_PROCESS_ATTACH)
-    {{
-        load_original_dll();
-        HMODULE hUE4SSDll = load_ue4ss_dll(hInstDll);
-        if (hUE4SSDll)
-        {{
-            setup_functions();
-        }}
-        else
-        {{
-            MessageBoxW(nullptr, L"Failed to load UE4SSL.dll. Please see the docs on correct installation: https://docs.ue4ss.com/installation-guide", L"UE4SS Error", MB_OK | MB_ICONERROR);
-            ExitProcess(0);
-        }}
-    }}
-    else if (fdwReason == DLL_PROCESS_DETACH)
-    {{
-        FreeLibrary(SOriginalDll);
-    }}
-    return TRUE;
-}}
-"#,
-        export_count = exports.len(),
-        dll_name = dll_name,
-        setup_lines = render_setup_lines(exports),
-    )
-}
-
-fn render_setup_lines(exports: &[ExportFunction]) -> String {
-    let mut lines = String::new();
-    for (index, export) in exports.iter().enumerate() {
+fn render_rust_file(dll_name: &str, exports: &[ExportFunction]) -> String {
+    let dll_name: Vec<u16> = dll_name.encode_utf16().chain(Some(0)).collect();
+    let mut out = format!(
+        "const ORIGINAL_DLL_NAME: &[u16] = &{dll_name:?};\n\
+         extern \"C\" {{ #[link_name = \"mProcs\"] static mut PROCEDURES: [usize; {count}]; }}\n\
+         static EXPORTS: [Export; {count}] = [\n",
+        count = exports.len(),
+    );
+    for export in exports {
         if export.is_named {
-            lines.push_str(&format!(
-                "    mProcs[{index}] = reinterpret_cast<uintptr_t>(GetProcAddress(SOriginalDll, \"{}\"));\n",
-                export.name.replace('\\', "\\\\").replace('"', "\\\""),
-            ));
+            let name: Vec<u8> = export.name.bytes().chain(Some(0)).collect();
+            out.push_str(&format!("    Export::Named(&{name:?}),\n"));
         } else {
-            lines.push_str(&format!(
-                "    mProcs[{index}] = reinterpret_cast<uintptr_t>(GetProcAddress(SOriginalDll, MAKEINTRESOURCEA({ordinal})));\n",
-                ordinal = export.ordinal,
-            ));
+            out.push_str(&format!("    Export::Ordinal({}),\n", export.ordinal));
         }
     }
-    lines
+    out.push_str("];\n");
+    // Rust cdylib no_mangle symbols become additional PE exports, even when a
+    // /DEF is supplied. Keep Rust symbols private and expose only COFF linkage
+    // names: the existing forwarding assembly still uses precisely mProcs.
+    out.push_str(
+        r#"core::arch::global_asm!(
+    ".text",
+    ".globl DllMain",
+    "DllMain:",
+    "jmp {entry}",
+    ".bss",
+    ".p2align 3",
+    ".globl mProcs",
+    "mProcs:",
+    ".zero {bytes}",
+    ".text",
+    entry = sym dll_main,
+    bytes = const EXPORTS.len() * core::mem::size_of::<usize>(),
+);
+"#,
+    );
+    out
 }
 
 fn read_c_string(bytes: &[u8], offset: usize) -> String {

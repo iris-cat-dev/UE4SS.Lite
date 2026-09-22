@@ -163,6 +163,48 @@ namespace RC::Compat::RustCore
     static_assert(alignof(HostHookContext) == 8, "HostHookContext align mismatch");
     static_assert(offsetof(HostHookContext, context) == 0, "HostHookContext.context offset mismatch");
 
+    using RuntimeGate = uint8_t (*)(void*);
+using RuntimeCloseSources = void (*)(void*);
+using RuntimeUnregisterOwner = void (*)(void*, uintptr_t);
+using RuntimeCallback = void (*)(void*);
+struct RuntimeConfig {
+SliceU16 working_directory{};
+SliceU16 mods_directory{};
+void* context{};
+RuntimeGate prepare_engine{};
+RuntimeGate program_ready{};
+RuntimeGate poll_input{};
+RuntimeCloseSources close_sources{};
+RuntimeUnregisterOwner unregister_owner{};
+uint64_t slow_update_threshold_ms{};
+uint8_t enable_slow_update_guard{};
+};
+struct RuntimeEvent {
+uintptr_t owner{};
+RuntimeCallback callback{};
+void* context{};
+RuntimeCallback release{};
+};
+    static_assert(sizeof(RuntimeConfig) == 96, "RuntimeConfig size mismatch");
+    static_assert(alignof(RuntimeConfig) == 8, "RuntimeConfig align mismatch");
+    static_assert(offsetof(RuntimeConfig, working_directory) == 0, "RuntimeConfig.working_directory offset mismatch");
+    static_assert(offsetof(RuntimeConfig, mods_directory) == 16, "RuntimeConfig.mods_directory offset mismatch");
+    static_assert(offsetof(RuntimeConfig, context) == 32, "RuntimeConfig.context offset mismatch");
+    static_assert(offsetof(RuntimeConfig, prepare_engine) == 40, "RuntimeConfig.prepare_engine offset mismatch");
+    static_assert(offsetof(RuntimeConfig, program_ready) == 48, "RuntimeConfig.program_ready offset mismatch");
+    static_assert(offsetof(RuntimeConfig, poll_input) == 56, "RuntimeConfig.poll_input offset mismatch");
+    static_assert(offsetof(RuntimeConfig, close_sources) == 64, "RuntimeConfig.close_sources offset mismatch");
+    static_assert(offsetof(RuntimeConfig, unregister_owner) == 72, "RuntimeConfig.unregister_owner offset mismatch");
+    static_assert(offsetof(RuntimeConfig, slow_update_threshold_ms) == 80, "RuntimeConfig.slow_update_threshold_ms offset mismatch");
+    static_assert(offsetof(RuntimeConfig, enable_slow_update_guard) == 88, "RuntimeConfig.enable_slow_update_guard offset mismatch");
+
+    static_assert(sizeof(RuntimeEvent) == 32, "RuntimeEvent size mismatch");
+    static_assert(alignof(RuntimeEvent) == 8, "RuntimeEvent align mismatch");
+    static_assert(offsetof(RuntimeEvent, owner) == 0, "RuntimeEvent.owner offset mismatch");
+    static_assert(offsetof(RuntimeEvent, callback) == 8, "RuntimeEvent.callback offset mismatch");
+    static_assert(offsetof(RuntimeEvent, context) == 16, "RuntimeEvent.context offset mismatch");
+    static_assert(offsetof(RuntimeEvent, release) == 24, "RuntimeEvent.release offset mismatch");
+
 }
 
 #endif // UE4SSL_GENERATED_RUSTCORE_ABI_HPP

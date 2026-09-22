@@ -11,10 +11,12 @@
 #include <Compat/CppApiShim.hpp>
 #include <Compat/HostShim.hpp>
 #include <Compat/RustCoreFFI.hpp>
+#include <Compat/RustRuntimeFFI.hpp>
 #include <Compat/UnrealBridge.hpp>
 #include <cwctype>
 #include <format>
 #include <filesystem>
+#include <new>
 #include <limits>
 #include <unordered_set>
 #include <DynamicOutput/DynamicOutput.hpp>
@@ -27,6 +29,7 @@
 #include <SigScanner/SinglePassSigScanner.hpp>
 #include <Signatures.hpp>
 #include <UE4SSProgram.hpp>
+#include <Compat/RustSupportFFI.hpp>
 #include <Unreal/AGameMode.hpp>
 #include <Unreal/AGameModeBase.hpp>
 #include <Unreal/GameplayStatics.hpp>
@@ -47,7 +50,6 @@
 #include <UnrealDef.hpp>
 //#include <MountPak.hpp>
 
-#include <polyhook2/PE/IatHook.hpp>
 
 #pragma comment(lib, "User32.lib")
 
@@ -55,17 +57,6 @@ namespace
 {
     static_assert(sizeof(RC::CharType) == sizeof(uint16_t));
 
-    struct NativeOwnedString
-    {
-        uint16_t* data{};
-        size_t len{};
-    };
-
-    extern "C"
-    {
-        auto ue4ssl_native_file_read_to_string(const uint16_t* path) -> NativeOwnedString;
-        auto ue4ssl_native_file_free_string(NativeOwnedString string) -> void;
-    }
 
     auto make_slice(RC::StringViewType value) -> RC::Compat::RustCore::SliceU16
     {
@@ -265,74 +256,6 @@ namespace RC
         Output::send(STR("\n##### MEMBER OFFSETS END #####\n\n"));
     }
 
-    auto should_dispatch_loaded_dll(StringViewType dll_name) -> bool
-    {
-        return Compat::HostApi::should_dispatch_dll_load(dll_name);
-    }
-
-    void* HookedLoadLibraryA(const char* dll_name)
-    {
-        UE4SSProgram& program = UE4SSProgram::get_program();
-        HMODULE lib = PLH::FnCast(program.m_hook_trampoline_load_library_a, &LoadLibraryA)(dll_name);
-        try
-        {
-            auto dll_name_view = ensure_str(dll_name);
-            if (should_dispatch_loaded_dll(dll_name_view))
-            {
-                program.fire_dll_load_for_cpp_mods(dll_name_view);
-            }
-        }
-        catch (...) {}
-        return lib;
-    }
-
-    void* HookedLoadLibraryExA(const char* dll_name, void* file, int32_t flags)
-    {
-        UE4SSProgram& program = UE4SSProgram::get_program();
-        HMODULE lib = PLH::FnCast(program.m_hook_trampoline_load_library_ex_a, &LoadLibraryExA)(dll_name, file, flags);
-        try
-        {
-            auto dll_name_view = ensure_str(dll_name);
-            if (should_dispatch_loaded_dll(dll_name_view))
-            {
-                program.fire_dll_load_for_cpp_mods(dll_name_view);
-            }
-        }
-        catch (...) {}
-        return lib;
-    }
-
-    void* HookedLoadLibraryW(const wchar_t* dll_name)
-    {
-        UE4SSProgram& program = UE4SSProgram::get_program();
-        HMODULE lib = PLH::FnCast(program.m_hook_trampoline_load_library_w, &LoadLibraryW)(dll_name);
-        try
-        {
-            auto dll_name_view = ToCharTypePtr(dll_name);
-            if (should_dispatch_loaded_dll(dll_name_view))
-            {
-                program.fire_dll_load_for_cpp_mods(dll_name_view);
-            }
-        }
-        catch (...) {}
-        return lib;
-    }
-
-    void* HookedLoadLibraryExW(const wchar_t* dll_name, void* file, int32_t flags)
-    {
-        UE4SSProgram& program = UE4SSProgram::get_program();
-        HMODULE lib = PLH::FnCast(program.m_hook_trampoline_load_library_ex_w, &LoadLibraryExW)(dll_name, file, flags);
-        try
-        {
-            auto dll_name_view = ToCharTypePtr(dll_name);
-            if (should_dispatch_loaded_dll(dll_name_view))
-            {
-                program.fire_dll_load_for_cpp_mods(dll_name_view);
-            }
-        }
-        catch (...) {}
-        return lib;
-    }
 
     UE4SSProgram::UE4SSProgram(const std::filesystem::path& moduleFilePath, std::initializer_list<BinaryOptions> options) : MProgram(options)
     {
@@ -387,41 +310,15 @@ namespace RC
 
             Output::send(STR("UE4SS Build Configuration: {} ({})\n"), ensure_str(UE4SS_CONFIGURATION), UE4SS_COMPILER);
 
-            m_load_library_a_hook = std::make_unique<PLH::IatHook>("kernel32.dll",
-                                                                   "LoadLibraryA",
-                                                                   std::bit_cast<uint64_t>(&HookedLoadLibraryA),
-                                                                   &m_hook_trampoline_load_library_a,
-                                                                   L"");
-            m_load_library_a_hook->hook();
-
-            m_load_library_ex_a_hook = std::make_unique<PLH::IatHook>("kernel32.dll",
-                                                                      "LoadLibraryExA",
-                                                                      std::bit_cast<uint64_t>(&HookedLoadLibraryExA),
-                                                                      &m_hook_trampoline_load_library_ex_a,
-                                                                      L"");
-            m_load_library_ex_a_hook->hook();
-
-            m_load_library_w_hook = std::make_unique<PLH::IatHook>("kernel32.dll",
-                                                                   "LoadLibraryW",
-                                                                   std::bit_cast<uint64_t>(&HookedLoadLibraryW),
-                                                                   &m_hook_trampoline_load_library_w,
-                                                                   L"");
-            m_load_library_w_hook->hook();
-
-            m_load_library_ex_w_hook = std::make_unique<PLH::IatHook>("kernel32.dll",
-                                                                      "LoadLibraryExW",
-                                                                      std::bit_cast<uint64_t>(&HookedLoadLibraryExW),
-                                                                      &m_hook_trampoline_load_library_ex_w,
-                                                                      L"");
-            m_load_library_ex_w_hook->hook();
+            if (!ue4ssl_install_dll_notifications())
+            {
+                throw std::runtime_error{"Unable to install DLL notifications"};
+            }
 
             Compat::UnrealBridge::setup_unreal_modules();
 
             setup_mod_directory_path();
 
-            setup_mods();
-            install_cpp_mods();
-            start_cpp_mods(IsInitialStartup::Yes);
 
             if (m_has_game_specific_config)
             {
@@ -469,9 +366,8 @@ namespace RC
 
     UE4SSProgram::~UE4SSProgram()
     {
-        m_processing_events = false;
-        Compat::CppApi::set_processing_state(false, false);
-        Compat::CppApi::set_program_started(false);
+        ue4ssl_runtime_shutdown();
+        ue4ssl_stop_dll_notifications();
 
         try
         {
@@ -482,64 +378,85 @@ namespace RC
 
     auto UE4SSProgram::init() -> void
     {
-        try
+        if (m_error_object->has_error())
         {
-            setup_unreal();
-
-            Output::send(STR("Unreal Engine modules ({}):\n"), SigScannerStaticData::m_is_modular ? STR("modular") : STR("non-modular"));
-            auto& main_exe_ptr = SigScannerStaticData::m_modules_info.array[static_cast<size_t>(ScanTarget::MainExe)].lpBaseOfDll;
-            for (size_t i = 0; i < static_cast<size_t>(ScanTarget::Max); ++i)
-            {
-                auto& module = SigScannerStaticData::m_modules_info.array[i];
-                // only log modules with unique addresses (non-modular builds have everything in MainExe)
-                if (i == static_cast<size_t>(ScanTarget::MainExe) || main_exe_ptr != module.lpBaseOfDll)
-                {
-                    auto module_name = ensure_str(ScanTargetToString(i));
-                    Output::send(STR("{} @ {} size={:#x}\n"), module_name.c_str(), module.lpBaseOfDll, module.SizeOfImage);
-                }
-            }
-
-            fire_unreal_init_for_cpp_mods();
-            setup_unreal_properties();
-            Compat::UnrealBridge::set_max_asset_loading_memory(settings_manager.Memory.MaxMemoryUsageDuringAssetLoading);
-
-            //output_all_member_offsets();
-
-            // Only deal with the event loop thread here if the 'Test' constructor doesn't need to be called
-#ifndef RUN_TESTS
-            // Program is now fully setup
-            // Start event loop
-            m_event_loop = std::jthread{&UE4SSProgram::update, this};
-
-            // Wait for thread
-            // There's a loop inside the thread that only exits when you hit the 'End' key on the keyboard
-            // As long as you don't do that the thread will stay open and accept further inputs
-            m_event_loop.join();
-#endif
-        }
-        catch (std::runtime_error& e)
-        {
-            if (!m_error_object->has_error())
-            {
-                copy_error_into_message(e.what());
-            }
             return;
         }
-        catch (std::exception& e)
+        const Compat::RustCore::RuntimeConfig config{
+                make_slice(m_working_directory.native()),
+                make_slice(m_mods_directory.native()),
+                this,
+                [](void* context) -> uint8_t {
+                    auto& program = *static_cast<UE4SSProgram*>(context);
+                    try
+                    {
+                        program.setup_unreal();
+                        Output::send(STR("Unreal Engine modules ({}):\n"), SigScannerStaticData::m_is_modular ? STR("modular") : STR("non-modular"));
+                        const auto main_exe = SigScannerStaticData::m_modules_info.array[static_cast<size_t>(ScanTarget::MainExe)].lpBaseOfDll;
+                        for (size_t index = 0; index < static_cast<size_t>(ScanTarget::Max); ++index)
+                        {
+                            auto& module = SigScannerStaticData::m_modules_info.array[index];
+                            if (index == static_cast<size_t>(ScanTarget::MainExe) || main_exe != module.lpBaseOfDll)
+                            {
+                                Output::send(STR("{} @ {} size={:#x}\n"), ensure_str(ScanTargetToString(index)), module.lpBaseOfDll, module.SizeOfImage);
+                            }
+                        }
+                        return 1;
+                    }
+                    catch (const std::exception& error)
+                    {
+                        program.copy_error_into_message(error.what());
+                    }
+                    catch (...)
+                    {
+                        program.copy_error_into_message("Unknown exception during Unreal initialization");
+                    }
+                    return 0;
+                },
+                [](void* context) -> uint8_t {
+                    auto& program = *static_cast<UE4SSProgram*>(context);
+                    try
+                    {
+                        Compat::UnrealBridge::set_max_asset_loading_memory(settings_manager.Memory.MaxMemoryUsageDuringAssetLoading);
+                        program.on_program_start();
+                        return 1;
+                    }
+                    catch (const std::exception& error)
+                    {
+                        program.copy_error_into_message(error.what());
+                    }
+                    catch (...)
+                    {
+                        program.copy_error_into_message("Unknown exception during program initialization");
+                    }
+                    return 0;
+                },
+                [](void* context) -> uint8_t {
+                    if (unreal_is_shutting_down) return 0;
+                    try
+                    {
+                        static_cast<UE4SSProgram*>(context)->m_input_handler.process_event();
+                        return 1;
+                    }
+                    catch (...)
+                    {
+                        return 0;
+                    }
+                },
+                [](void* context) {
+                    auto& handler = static_cast<UE4SSProgram*>(context)->m_input_handler;
+                    handler.unregister_kind(static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Lua));
+                    handler.unregister_kind(static_cast<uint8_t>(Compat::ScriptKeybindCustomData::JavaScript));
+                },
+                [](void* context, uintptr_t owner) {
+                    static_cast<UE4SSProgram*>(context)->unregister_input_owner(owner);
+                },
+                static_cast<uint64_t>(std::max<int64_t>(0, settings_manager.General.SlowCppModUpdateThresholdMs)),
+                static_cast<uint8_t>(settings_manager.General.EnableSlowCppModUpdateGuard),
+        };
+        if (!ue4ssl_runtime_start(&config) && !m_error_object->has_error())
         {
-            if (!m_error_object->has_error())
-            {
-                copy_error_into_message(e.what());
-            }
-            return;
-        }
-        catch (...)
-        {
-            if (!m_error_object->has_error())
-            {
-                copy_error_into_message("Unknown exception during UE4SSProgram::init()");
-            }
-            return;
+            copy_error_into_message("Rust runtime initialization failed");
         }
     }
 
@@ -890,527 +807,24 @@ namespace RC
 
     auto UE4SSProgram::on_program_start() -> void
     {
-        using namespace Unreal;
-
-// #ifdef TIME_FUNCTION_MACRO_ENABLED
-//         m_input_handler.register_keydown_event(Input::Key::Y, {Input::ModifierKey::CONTROL}, [&]() {
-//             if (FunctionTimerFrame::s_timer_enabled)
-//             {
-//                 FunctionTimerFrame::stop_profiling();
-//                 FunctionTimerFrame::dump_profile();
-//                 Output::send(STR("Profiler stopped & dumped\n"));
-//             }
-//             else
-//             {
-//                 FunctionTimerFrame::start_profiling();
-//                 Output::send(STR("Profiler started\n"));
-//             }
-//         });
-// #endif
-
-        TRY([&] {
-            m_is_program_started = true;
-            Compat::CppApi::set_program_started(true);
-
-            // if (settings_manager.General.EnableHotReloadSystem)
-            // {
-            //     m_input_handler.register_keydown_event(Input::Key::R, {Input::ModifierKey::CONTROL}, [&]() {
-            //         TRY([&] {
-            //             reinstall_mods();
-            //         });
-            //     });
-            // }
-
-            if ((settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects || settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders) &&
-                Unreal::Version::IsBelow(4, 17))
-            {
-                Output::send<LogLevel::Warning>(
-                        STR("FAssetData not available in <4.17, ignoring 'LoadAllAssetsBeforeDumpingObjects' & 'LoadAllAssetsBeforeGeneratingCXXHeaders'."));
-            }
-
-            fire_program_start_for_cpp_mods();
-        });
-
-    }
-
-    auto UE4SSProgram::update() -> void
-    {
-        on_program_start();
-
-        Output::send(STR("Event loop start\n"));
-        m_processing_events = true;
-        Compat::CppApi::set_processing_state(m_processing_events, m_pause_events_processing);
-        for (; m_processing_events;)
+        if ((settings_manager.ObjectDumper.LoadAllAssetsBeforeDumpingObjects || settings_manager.CXXHeaderGenerator.LoadAllAssetsBeforeGeneratingCXXHeaders) &&
+            Unreal::Version::IsBelow(4, 17))
         {
-            if (m_pause_events_processing || UE4SSProgram::unreal_is_shutting_down)
-            {
-                continue;
-            }
-
-            if (!is_queue_empty())
-            {
-                static constexpr size_t max_events_executed_per_frame = 5;
-                size_t num_events_executed{};
-                std::lock_guard<std::mutex> guard(m_event_queue_mutex);
-                m_queued_events.erase(std::remove_if(m_queued_events.begin(),
-                                                     m_queued_events.end(),
-                                                     [&](Event& event) -> bool {
-                                                         if (num_events_executed >= max_events_executed_per_frame)
-                                                         {
-                                                             return false;
-                                                         }
-                                                         ++num_events_executed;
-                                                         try
-                                                         {
-                                                             event.callable(event.data);
-                                                         }
-                                                         catch (const std::exception& e)
-                                                         {
-                                                             Output::send<LogLevel::Error>(STR("[UE4SS] Exception in queued event: {}\n"), ensure_str(e.what()));
-                                                         }
-                                                         catch (...)
-                                                         {
-                                                             Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in queued event\n"));
-                                                         }
-                                                         return true;
-                                                     }),
-                                      m_queued_events.end());
-            }
-
-            m_input_handler.process_event();
-
-            {
-                for (auto& mod : m_mods)
-                {
-                    if (mod->is_started() && !mod->are_updates_disabled())
-                    {
-                        const auto update_started_at = std::chrono::steady_clock::now();
-                        try
-                        {
-                            mod->fire_update();
-                        }
-                        catch (const std::exception& e)
-                        {
-                            Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' fire_update: {}\n"), mod->get_name(), ensure_str(e.what()));
-                        }
-                        catch (...)
-                        {
-                            Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' fire_update\n"), mod->get_name());
-                        }
-
-                        if (settings_manager.General.EnableSlowCppModUpdateGuard && mod->should_apply_slow_update_guard())
-                        {
-                            const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::steady_clock::now() - update_started_at
-                            ).count();
-                            if (elapsed_ms >= settings_manager.General.SlowCppModUpdateThresholdMs)
-                            {
-                                mod->set_updates_disabled(true);
-                                Output::send<LogLevel::Warning>(
-                                    STR("[UE4SS] Disabled further on_update calls for mod '{}' after a blocking update took {}ms (threshold={}ms). "
-                                        "This usually means the mod is doing blocking work such as sleep inside on_update.\n"),
-                                    mod->get_name(),
-                                    elapsed_ms,
-                                    settings_manager.General.SlowCppModUpdateThresholdMs
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
-        Compat::CppApi::set_processing_state(false, m_pause_events_processing);
-        Output::send(STR("Event loop end\n"));
-    }
-
-    auto UE4SSProgram::setup_unreal_properties() -> void
-    {
-    }
-
-    auto UE4SSProgram::setup_mods() -> void
-    {
-        Output::send(STR("Setting up mods...\n"));
-
-        if (!std::filesystem::exists(m_mods_directory))
-        {
-            set_error("Mods directory doesn't exist, please create it: <%S>", m_mods_directory.c_str());
-        }
-
-        auto discovered_mods = Compat::CppApi::discover_mods(m_working_directory, m_mods_directory);
-
-        for (auto& discovered_mod : discovered_mods)
-        {
-            try
-            {
-                if (discovered_mod.dll_name)
-                {
-                    m_mods.emplace_back(std::make_unique<CppMod>(
-                            *this, std::move(discovered_mod.mod_name), ensure_str(discovered_mod.mod_path), std::move(*discovered_mod.dll_name)));
-                }
-                else
-                {
-                    m_mods.emplace_back(
-                            std::make_unique<CppMod>(*this, std::move(discovered_mod.mod_name), ensure_str(discovered_mod.mod_path)));
-                }
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception while creating mod '{}': {}\n"), discovered_mod.mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception while creating mod '{}'\n"), discovered_mod.mod_name);
-            }
+            Output::send<LogLevel::Warning>(
+                    STR("FAssetData not available in <4.17, ignoring 'LoadAllAssetsBeforeDumpingObjects' & 'LoadAllAssetsBeforeGeneratingCXXHeaders'."));
         }
     }
 
-    template <typename ModType>
-    auto install_mods(std::vector<std::unique_ptr<Mod>>& mods) -> void
-    {
-        
-        for (auto& mod : mods)
-        {
-            if (!dynamic_cast<ModType*>(mod.get()))
-            {
-                continue;
-            }
 
-            bool mod_name_is_taken = std::find_if(mods.begin(), mods.end(), [&](auto& elem) {
-                                         return elem->get_name() == mod->get_name();
-                                     }) == mods.end();
-
-            if (mod_name_is_taken)
-            {
-                mod->set_installable(false);
-                Output::send(STR("Mod name '{}' is already in use.\n"), mod->get_name());
-                continue;
-            }
-
-            if (mod->is_installed())
-            {
-                Output::send(STR("Tried to install a mod that was already installed, Mod: '{}'\n"), mod->get_name());
-                continue;
-            }
-
-            if (!mod->is_installable())
-            {
-                Output::send(STR("Was unable to install mod '{}' for unknown reasons. Mod is not installable.\n"), mod->get_name());
-                continue;
-            }
-
-            Output::send(STR("Install mod '{}'.\n"), mod->get_name());
-            mod->set_installed(true);
-        }
-    }
-
-    auto UE4SSProgram::install_cpp_mods() -> void
-    {
-        install_mods<CppMod>(get_program().m_mods);
-    }
-
-    auto UE4SSProgram::fire_unreal_init_for_cpp_mods() -> void
-    {
-        for (const auto& mod : m_mods)
-        {
-            if (!dynamic_cast<CppMod*>(mod.get())) continue;
-            try
-            {
-                mod->fire_unreal_init();
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' fire_unreal_init: {}\n"), mod->get_name(), ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' fire_unreal_init\n"), mod->get_name());
-            }
-        }
-    }
-
-    auto UE4SSProgram::fire_ui_init_for_cpp_mods() -> void
-    {
-        for (const auto& mod : m_mods)
-        {
-            if (!dynamic_cast<CppMod*>(mod.get())) continue;
-            try
-            {
-                mod->fire_ui_init();
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' fire_ui_init: {}\n"), mod->get_name(), ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' fire_ui_init\n"), mod->get_name());
-            }
-        }
-    }
-
-    auto UE4SSProgram::fire_program_start_for_cpp_mods() -> void
-    {
-        for (const auto& mod : m_mods)
-        {
-            if (!dynamic_cast<CppMod*>(mod.get())) continue;
-            try
-            {
-                mod->fire_program_start();
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' fire_program_start: {}\n"), mod->get_name(), ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' fire_program_start\n"), mod->get_name());
-            }
-        }
-    }
-
-    auto UE4SSProgram::fire_dll_load_for_cpp_mods(StringViewType dll_name) -> void
-    {
-        for (const auto& mod : m_mods)
-        {
-            if (auto cpp_mod = dynamic_cast<CppMod*>(mod.get()); cpp_mod)
-            {
-                try
-                {
-                    cpp_mod->fire_dll_load(dll_name);
-                }
-                catch (const std::exception& e)
-                {
-                    Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' fire_dll_load: {}\n"), mod->get_name(), ensure_str(e.what()));
-                }
-                catch (...)
-                {
-                    Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' fire_dll_load\n"), mod->get_name());
-                }
-            }
-        }
-    }
-
-    auto startup_step_mod_name(const Compat::Host::ModStartupStep& step) -> StringViewType
-    {
-        if (!step.mod_name || step.mod_name_len == 0)
-        {
-            return {};
-        }
-
-        return {reinterpret_cast<const CharType*>(step.mod_name), step.mod_name_len};
-    }
-
-    template <typename ModType>
-    auto start_named_mod(StringViewType mod_name) -> void
-    {
-        auto mod = UE4SSProgram::find_mod_by_name<ModType>(mod_name, UE4SSProgram::IsInstalled::Yes);
-        if (!mod || mod->is_started())
-        {
-            return;
-        }
-
-        Output::send(STR("Load Mod '{}' , starting mod.\n"), mod->get_name().data());
-        mod->start_mod();
-    }
-
-    template <typename ModType>
-    auto start_discovered_mods() -> std::string
-    {
-        std::filesystem::path mods_directory = UE4SSProgram::get_program().get_mods_directory();
-
-        for (const auto& mod_directory : std::filesystem::directory_iterator(mods_directory))
-        {
-           
-            std::error_code ec{};
-
-            if (!mod_directory.is_directory(ec))
-            {
-                Output::send(STR("is_directory false\n"));
-                continue;
-            }
-            if (ec.value() != 0)
-            {
-                return std::format("is_directory ran into error {}", ec.value());
-            }
-
-            // if (!std::filesystem::exists(mod_directory.path() / "enabled.txt", ec))
-            // {
-            //     continue;
-            // }
-
-            //if (ec.value() != 0)
-            //{
-            //    return std::format("exists ran into error {}", ec.value());
-            //}
-
-            const auto mod_directory_name = ensure_str(mod_directory.path().filename());
-            auto mod = UE4SSProgram::find_mod_by_name<ModType>(mod_directory_name, UE4SSProgram::IsInstalled::Yes);
-            if (!mod)
-            {
-                continue;
-            }
-            if (!dynamic_cast<ModType*>(mod))
-            {
-                Output::send(STR("Mod dynamic_cast error: {} \n"), mod_directory_name);
-                continue;
-            }
-
-            if (mod->is_started())
-            {
-                continue;
-            }
-
-            Output::send(STR("Load Mod '{}' , starting mod.\n"), mod->get_name().data());
-            mod->start_mod();
-        }
-
-        return {};
-    }
-
-    template <typename ModType>
-    auto start_mods() -> std::string
-    {
-        const auto startup_sequence = Compat::HostApi::plan_mod_startup_sequence();
-        for (size_t step_index = 0; step_index < startup_sequence.len; ++step_index)
-        {
-            const auto& step = startup_sequence.steps[step_index];
-            switch (static_cast<Compat::Host::ModStartupAction>(step.action))
-            {
-            case Compat::Host::ModStartupAction::StartNamedMod:
-                start_named_mod<ModType>(startup_step_mod_name(step));
-                break;
-            case Compat::Host::ModStartupAction::StartDiscoveredMods:
-            {
-                auto error_message = start_discovered_mods<ModType>();
-                if (!error_message.empty())
-                {
-                    return error_message;
-                }
-                break;
-            }
-            default:
-                Output::send<LogLevel::Warning>(STR("[UE4SS] Ignoring unknown mod startup action {}\n"), step.action);
-                break;
-            }
-        }
-
-        return {};
-    }
-
-    auto UE4SSProgram::start_cpp_mods(IsInitialStartup is_initial_startup) -> void
-    {
-        auto error_message = start_mods<CppMod>();
-        if (!error_message.empty())
-        {
-            set_error(error_message.c_str());
-        }
-        // If this is the initial startup, notify mods that the UI has initialized.
-        // This isn't completely accurate since the UI will usually have started a while ago.
-        // However, we can't immediately notify mods of this because no mods have been started at that point.
-        // We only need to do this for the initial start of UE4SS because after that, more accurate notifications will happen when the UI is closed an reopened.
-        if (is_initial_startup == IsInitialStartup::Yes && m_render_thread.get_id() != std::this_thread::get_id())
-        {
-            fire_ui_init_for_cpp_mods();
-        }
-    }
-
-    auto UE4SSProgram::uninstall_mods() -> void
-    {
-        std::vector<CppMod*> cpp_mods{};
-        for (auto& mod : m_mods)
-        {
-            if (auto cpp_mod = dynamic_cast<CppMod*>(mod.get()); cpp_mod)
-            {
-                cpp_mods.emplace_back(cpp_mod);
-            }
-        }
-
-        for (auto& mod : cpp_mods)
-        {
-            mod->uninstall();
-        }
-
-        m_mods.clear();
-    }
 
     auto UE4SSProgram::is_program_started() -> bool
     {
-        return m_is_program_started;
+        return ue4ssl_core_get_program_flags().is_program_started != 0;
     }
 
     auto UE4SSProgram::reinstall_mods() -> void
     {
-        Output::send(STR("Re-installing all mods\n"));
-        const auto unreal_runtime_state = Compat::UnrealBridge::runtime_state();
-        const auto reinstall_sequence = Compat::HostApi::plan_reinstall_sequence(
-                unreal_runtime_state.is_unreal_initialized != 0, is_program_started());
-
-        auto remove_script_keybinds = [&]() {
-            auto& key_events = m_input_handler.get_events();
-            std::erase_if(key_events, [](Input::KeySet& input_event) -> bool {
-                bool were_all_events_registered_from_scripts = true;
-                for (auto& [key, vector_of_key_data] : input_event.key_data)
-                {
-                    std::erase_if(vector_of_key_data, [&](Input::KeyData& key_data) -> bool {
-                        // custom_data == 1: Bind came from Lua, and custom_data2 is nullptr.
-                        // custom_data == 2: Bind came from C++, and custom_data2 is a pointer to KeyDownEventData. Must free it.
-                        // custom_data == 3: Bind came from JavaScript, and custom_data2 is nullptr.
-                        if (key_data.custom_data == static_cast<uint8_t>(Compat::ScriptKeybindCustomData::Lua) ||
-                            key_data.custom_data == static_cast<uint8_t>(Compat::ScriptKeybindCustomData::JavaScript))
-                        {
-                            return true;
-                        }
-                        else
-                        {
-                            were_all_events_registered_from_scripts = false;
-                            return false;
-                        }
-                    });
-                }
-
-                return were_all_events_registered_from_scripts;
-            });
-        };
-
-        for (size_t step_index = 0; step_index < reinstall_sequence.len; ++step_index)
-        {
-            const auto& step = reinstall_sequence.steps[step_index];
-            switch (static_cast<Compat::Host::ReinstallAction>(step.action))
-            {
-            case Compat::Host::ReinstallAction::ResetDllDispatchCache:
-                Compat::HostApi::reset_dll_dispatch_cache();
-                break;
-            case Compat::Host::ReinstallAction::SetPauseProcessing:
-                m_pause_events_processing = step.value != 0;
-                Compat::CppApi::set_processing_state(m_processing_events, m_pause_events_processing);
-                break;
-            case Compat::Host::ReinstallAction::UninstallMods:
-                uninstall_mods();
-                break;
-            case Compat::Host::ReinstallAction::RemoveScriptKeybinds:
-                remove_script_keybinds();
-                break;
-            case Compat::Host::ReinstallAction::SetupMods:
-                setup_mods();
-                break;
-            case Compat::Host::ReinstallAction::StartCppMods:
-                start_cpp_mods();
-                break;
-            case Compat::Host::ReinstallAction::FireUnrealInit:
-                fire_unreal_init_for_cpp_mods();
-                break;
-            case Compat::Host::ReinstallAction::FireProgramStart:
-                fire_program_start_for_cpp_mods();
-                break;
-            default:
-                Output::send<LogLevel::Warning>(STR("[UE4SS] Ignoring unknown reinstall action {}\n"), step.action);
-                break;
-            }
-        }
-
-        Output::send(STR("All mods re-installed\n"));
+        ue4ssl_runtime_reinstall();
     }
 
     auto UE4SSProgram::get_module_directory() -> RC::StringType
@@ -1440,31 +854,67 @@ namespace RC
 
     auto UE4SSProgram::queue_event(EventCallable callable, void* data) -> void
     {
-        if (!can_process_events())
+        queue_event_owned(ue4ssl_runtime_current_owner(), callable, data, nullptr);
+    }
+
+    auto UE4SSProgram::queue_event_owned(uintptr_t owner, EventCallable callable, void* data, EventCallable release) -> bool
+    {
+        struct Context
         {
-            return;
+            EventCallable callable;
+            void* data;
+            EventCallable release;
+        };
+        auto* context = callable ? new (std::nothrow) Context{callable, data, release} : nullptr;
+        if (!context)
+        {
+            try
+            {
+                if (release) release(data);
+            }
+            catch (...) {}
+            return false;
         }
-        std::lock_guard<std::mutex> guard(m_event_queue_mutex);
-        m_queued_events.emplace_back(Event{callable, data});
+        return ue4ssl_runtime_queue_event({
+                owner,
+                [](void* opaque) {
+                    auto* context = static_cast<Context*>(opaque);
+                    try
+                    {
+                        if (context->callable) context->callable(context->data);
+                    }
+                    catch (const std::exception& error)
+                    {
+                        try
+                        {
+                            Output::send<LogLevel::Error>(STR("Exception in queued event: {}\n"), ensure_str(error.what()));
+                        }
+                        catch (...) {}
+                    }
+                    catch (...) {}
+                },
+                context,
+                [](void* opaque) {
+                    auto* context = static_cast<Context*>(opaque);
+                    try
+                    {
+                        if (context->release) context->release(context->data);
+                    }
+                    catch (...) {}
+                    delete context;
+                },
+        }) != 0;
     }
 
     auto UE4SSProgram::is_queue_empty() -> bool
     {
-        // Not locking here because if the worst that could happen as far as I know is that the event loop processes the event slightly late.
-        return m_queued_events.empty();
+        return ue4ssl_runtime_queue_empty() != 0;
     }
 
-    auto UE4SSProgram::get_all_input_events(std::function<void(Input::KeySet&)> callback) -> void
-    {
-        for (auto& key_set : m_input_handler.get_events())
-        {
-            callback(key_set);
-        }
-    }
 
     auto UE4SSProgram::register_keydown_event(Input::Key key, const Input::EventCallbackCallable& callback, uint8_t custom_data, void* custom_data2) -> void
     {
-        m_input_handler.register_keydown_event(key, callback, custom_data, custom_data2);
+        m_input_handler.register_keydown_event(key, callback, reinterpret_cast<uintptr_t>(custom_data2), custom_data);
     }
 
     auto UE4SSProgram::register_keydown_event(Input::Key key,
@@ -1473,7 +923,7 @@ namespace RC
                                               uint8_t custom_data,
                                               void* custom_data2) -> void
     {
-        m_input_handler.register_keydown_event(key, modifier_keys, callback, custom_data, custom_data2);
+        m_input_handler.register_keydown_event(key, modifier_keys, callback, reinterpret_cast<uintptr_t>(custom_data2), custom_data);
     }
 
     auto UE4SSProgram::is_keydown_event_registered(Input::Key key) -> bool
@@ -1486,42 +936,32 @@ namespace RC
         return m_input_handler.is_keydown_event_registered(key, modifier_keys);
     }
 
+    auto UE4SSProgram::unregister_input_owner(uintptr_t owner) -> void
+    {
+        m_input_handler.unregister_owner(owner);
+        ue4ssl_runtime_cancel_owner(owner);
+    }
+
+    auto UE4SSProgram::register_keydown_event_owned(Input::Key key, const Input::EventCallbackCallable& callback, uint8_t kind, uintptr_t owner) -> uint64_t
+    {
+        return m_input_handler.register_keydown_event(key, callback, owner, kind);
+    }
+
+    auto UE4SSProgram::register_keydown_event_owned(Input::Key key,
+                                                  const Input::Handler::ModifierKeyArray& modifier_keys,
+                                                  const Input::EventCallbackCallable& callback,
+                                                  uint8_t kind,
+                                                  uintptr_t owner) -> uint64_t
+    {
+        return m_input_handler.register_keydown_event(key, modifier_keys, callback, owner, kind);
+    }
+
     auto UE4SSProgram::find_mod_by_name_internal(StringViewType mod_name, IsInstalled is_installed, IsStarted is_started, FMBNI_ExtraPredicate extra_predicate)
             -> Mod*
     {
-        auto mod_exists_with_name = std::find_if(get_program().m_mods.begin(), get_program().m_mods.end(), [&](auto& elem) -> bool {
-            bool found = true;
-
-            if (!extra_predicate(elem.get()))
-            {
-                found = false;
-            }
-            if (mod_name != elem->get_name())
-            {
-                found = false;
-            }
-            if (is_installed == IsInstalled::Yes && !elem->is_installable())
-            {
-                found = false;
-            }
-            if (is_started == IsStarted::Yes && !elem->is_started())
-            {
-                found = false;
-            }
-
-            return found;
-        });
-
-        // clang-format off
-        if (mod_exists_with_name == get_program().m_mods.end())
-        {
-            return nullptr;
-        }
-        // clang-format on
-        else
-        {
-            return mod_exists_with_name->get();
-        }
+        auto* mod = static_cast<Mod*>(ue4ssl_runtime_find_mod(make_slice(mod_name),
+                is_installed == IsInstalled::Yes, is_started == IsStarted::Yes));
+        return mod && (!extra_predicate || extra_predicate(mod)) ? mod : nullptr;
     }
 
     auto UE4SSProgram::get_object_dumper_output_directory() -> const RC::StringType
@@ -1529,12 +969,4 @@ namespace RC
         return ensure_str(m_object_dumper_output_directory);
     }
 
-    auto UE4SSProgram::static_cleanup() -> void
-    {
-        try
-        {
-            delete &get_program();
-        }
-        catch (...) {}
-    }
 } // namespace RC

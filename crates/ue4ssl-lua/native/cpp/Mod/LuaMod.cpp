@@ -75,6 +75,30 @@ namespace RC
     bool LuaStatics::console_executor_enabled{};
     using GameThreadExecutionMethod = LuaMod::GameThreadExecutionMethod;
 
+    struct LuaInputReference
+    {
+        const LuaMadeSimple::Lua& lua;
+        int index;
+        LuaInputReference(const LuaMadeSimple::Lua& lua, int index) : lua(lua), index(index) {}
+        ~LuaInputReference()
+        {
+            try
+            {
+                std::lock_guard<std::recursive_mutex> guard{LuaMod::m_thread_actions_mutex};
+                luaL_unref(lua.get_lua_state(), LUA_REGISTRYINDEX, index);
+            }
+            catch (...) { Output::Internal::internal_error = true; }
+        }
+    };
+
+    static auto make_owned_input_callback(const LuaMadeSimple::Lua& lua, int index,
+                                         void (*callback)(const LuaMadeSimple::Lua&, int)) -> Input::EventCallbackCallable
+    {
+        return [reference = std::make_shared<LuaInputReference>(lua, index), callback]() {
+            callback(reference->lua, reference->index);
+        };
+    }
+
     static auto normalize_path_for_lua(const std::filesystem::path& path) -> std::string
     {
         return to_utf8_string(path.lexically_normal().generic_wstring());
@@ -1689,6 +1713,10 @@ Overloads:
                                     "Lua function 'IsKeyBindRegistered', overload #2, requires a table of 1-byte large integers as the second parameter");
                         }
 
+                        if (table_counter >= modifier_keys.size())
+                        {
+                            lua.throw_error("A key binding supports at most three modifier keys");
+                        }
                         modifier_keys[table_counter++] = static_cast<Input::ModifierKey>(table.value.get_integer());
 
                         return false;
@@ -1759,12 +1787,10 @@ Overloads:
 
                     // Taking 'lua_callback_registry_index' by copy here to ensure its survival
                     // Using a 'custom_data' of 1 to signify that this keydown event was created by a mod
-                    mod->m_program.register_keydown_event(
+                    mod->m_program.register_keydown_event_owned(
                             key_to_register,
-                            [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                            },
-                            1, mod);
+                            make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                            1, reinterpret_cast<uintptr_t>(mod));
                 }
                 else if (lua.is_table())
                 {
@@ -1790,6 +1816,10 @@ Overloads:
                                     "Lua function 'RegisterKeyBindAsync', overload #2, requires a table of 1-byte large integers as the second parameter");
                         }
 
+                        if (table_counter >= modifier_keys.size())
+                        {
+                            lua.throw_error("A key binding supports at most three modifier keys");
+                        }
                         modifier_keys[table_counter++] = static_cast<Input::ModifierKey>(table.value.get_integer());
 
                         return false;
@@ -1803,22 +1833,18 @@ Overloads:
 
                     if (table_counter > 0)
                     {
-                        mod->m_program.register_keydown_event(
+                        mod->m_program.register_keydown_event_owned(
                                 key_to_register,
                                 modifier_keys,
-                                [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                    lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                                },
-                                1, mod);
+                                make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                                1, reinterpret_cast<uintptr_t>(mod));
                     }
                     else
                     {
-                        mod->m_program.register_keydown_event(
+                        mod->m_program.register_keydown_event_owned(
                                 key_to_register,
-                                [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                    lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                                },
-                                1, mod);
+                                make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                                1, reinterpret_cast<uintptr_t>(mod));
                     }
                 }
                 else
@@ -1878,12 +1904,10 @@ Overloads:
 
                     // Taking 'lua_callback_registry_index' by copy here to ensure its survival
                     // Using a 'custom_data' of 1 to signify that this keydown event was created by a mod
-                    mod->m_program.register_keydown_event(
+                    mod->m_program.register_keydown_event_owned(
                             key_to_register,
-                            [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                            },
-                            1, mod);
+                            make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                            1, reinterpret_cast<uintptr_t>(mod));
                 }
                 else if (lua.is_table())
                 {
@@ -1907,6 +1931,10 @@ Overloads:
                             lua.throw_error("Lua function 'RegisterKeyBind', overload #2, requires a table of 1-byte large integers as the second parameter");
                         }
 
+                        if (table_counter >= modifier_keys.size())
+                        {
+                            lua.throw_error("A key binding supports at most three modifier keys");
+                        }
                         modifier_keys[table_counter++] = static_cast<Input::ModifierKey>(table.value.get_integer());
 
                         return false;
@@ -1920,22 +1948,18 @@ Overloads:
 
                     if (table_counter > 0)
                     {
-                        mod->m_program.register_keydown_event(
+                        mod->m_program.register_keydown_event_owned(
                                 key_to_register,
                                 modifier_keys,
-                                [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                    lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                                },
-                                1, mod);
+                                make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                                1, reinterpret_cast<uintptr_t>(mod));
                     }
                     else
                     {
-                        mod->m_program.register_keydown_event(
+                        mod->m_program.register_keydown_event_owned(
                                 key_to_register,
-                                [&lua, lua_callback_registry_index, &lua_keybind_callback_lambda]() {
-                                    lua_keybind_callback_lambda(lua, lua_callback_registry_index);
-                                },
-                                1, mod);
+                                make_owned_input_callback(lua, lua_callback_registry_index, lua_keybind_callback_lambda),
+                                1, reinterpret_cast<uintptr_t>(mod));
                     }
                 }
                 else
@@ -5611,16 +5635,18 @@ Overloads:
 
     auto LuaMod::uninstall() -> void
     {
-        // ProcessEvent hook may try to run, and the lua state will not be valid
-        std::lock_guard<std::recursive_mutex> guard{LuaMod::m_thread_actions_mutex};
-
-        Output::send(STR("Stopping mod '{}' for uninstall\n"), m_mod_name);
-
         if (m_async_thread.joinable())
         {
             m_async_thread.request_stop();
             m_async_thread.join();
         }
+        // Drain input callbacks before taking the Lua lock that callbacks also acquire.
+        UE4SSProgram::get_program().unregister_input_owner(reinterpret_cast<uintptr_t>(this));
+        // ProcessEvent hook may try to run, and the lua state will not be valid
+        std::lock_guard<std::recursive_mutex> guard{LuaMod::m_thread_actions_mutex};
+
+        Output::send(STR("Stopping mod '{}' for uninstall\n"), m_mod_name);
+
 
         erase_from_container(this, m_static_construct_object_lua_callbacks);
         erase_from_container(this, m_process_console_exec_pre_callbacks);
@@ -5640,27 +5666,6 @@ Overloads:
         erase_from_container(this, m_local_player_exec_post_callbacks);
         erase_from_container(this, m_script_hook_callbacks);
 
-        UE4SSProgram::get_program().get_all_input_events([&](auto& key_set) {
-            std::erase_if(key_set.key_data,
-                          [&](auto& item) -> bool {
-                              auto& [_, key_data] = item;
-                              std::erase_if(key_data,
-                                            [&](Input::KeyData& key_data) -> bool {
-                                                // custom_data == 1: Bind came from Lua, and custom_data2 is a pointer to LuaMod.
-                                                // custom_data == 2: Bind came from C++, and custom_data2 is a pointer to KeyDownEventData. Must free it.
-                                                if (key_data.custom_data == 1)
-                                                {
-                                                    return key_data.custom_data2 == this;
-                                                }
-                                                else
-                                                {
-                                                    return false;
-                                                }
-                                            });
-
-                              return key_data.empty();
-                          });
-        });
 
 
         // Mark all hooks for this mod as scheduled_for_removal BEFORE closing Lua state

@@ -31,8 +31,7 @@ namespace RC
 
 
       protected:
-        // Whether the mod can be installed
-        // This is true by default and is only false if the state of the mod won't allow for a successful installation
+        // Script-VM adapter state only. CppMod overrides every accessor with Rust runtime queries.
         bool m_installable{true};
         bool m_installed{false};
         mutable bool m_is_started{false};
@@ -62,7 +61,6 @@ namespace RC
         virtual auto is_started() const -> bool;
         virtual auto set_updates_disabled(bool) -> void;
         virtual auto are_updates_disabled() const -> bool;
-        auto should_apply_slow_update_guard() const -> bool;
 
       public:
         // Main update from the program

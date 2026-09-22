@@ -10,7 +10,8 @@ use cc::Build;
 use common::{
     apply_common_defines, apply_common_msvc_flags, cc_archive_path, common_native_include_dirs,
     define, emit_dylib_link, emit_rerun_for_tree, generate_abi_headers, require_paths_exist,
-    target_dir, version_defines, whole_archive_flag, workspace_root_from_manifest_dir, BuildProfile,
+    target_dir, version_defines, whole_archive_flag, workspace_root_from_manifest_dir,
+    BuildProfile,
 };
 use serde::Deserialize;
 
@@ -47,7 +48,8 @@ fn try_build_from_file(path: &Path) -> Result<()> {
         bail!("native C++ mods currently support only windows-msvc targets");
     }
 
-    let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing CARGO_MANIFEST_DIR")?);
+    let manifest_dir =
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing CARGO_MANIFEST_DIR")?);
     let workspace_root = PathBuf::from(&input.workspace_root);
     let derived_workspace_root = workspace_root_from_manifest_dir(&manifest_dir);
     if derived_workspace_root != workspace_root {
@@ -78,7 +80,10 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     let include_label = format!("{} include dirs", input.mod_name);
     require_paths_exist(&include_label, include_dirs.iter());
 
-    println!("cargo:rerun-if-changed={}", workspace_root.join("version.cache").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_root.join("version.cache").display()
+    );
     for source in &source_files {
         println!("cargo:rerun-if-changed={}", source.display());
     }
@@ -87,8 +92,12 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     }
     emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include"));
     emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"));
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"));
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"));
+    emit_rerun_for_tree(
+        &workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"),
+    );
+    emit_rerun_for_tree(
+        &workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
+    );
 
     let generated = generate_abi_headers(&out_dir).context("failed to generate ABI headers")?;
     compile_archive(
@@ -115,7 +124,7 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     let archive = cc_archive_path(&out_dir, &input.archive_stem);
     println!(
         "cargo:rustc-link-arg-cdylib={}",
-        whole_archive_flag(&archive).display()
+        whole_archive_flag(&archive)
     );
 
     Ok(())
@@ -148,8 +157,8 @@ fn compile_archive(
         build.include(include);
     }
 
-    for define_arg in version_defines(workspace_root, profile) {
-        define(&mut build, define_arg.as_ref());
+    for (name, value) in version_defines(workspace_root, profile) {
+        define(&mut build, &name, value.as_deref());
     }
     for (name, value) in &input.defines {
         build.define(name, value.as_deref());

@@ -41,10 +41,6 @@ namespace RC::Output
     class RC_DYNOUT_API OutputDevice
     {
       protected:
-        // Whether the device is ready to process output
-        // It's up to each derived device to decide when they're ready and whether they use this member at all
-        mutable bool m_is_device_ready{};
-
         // Formatter function
         using Formatter = RC::StringType (*)(RC::StringViewType);
         Formatter m_formatter{&default_format_string};

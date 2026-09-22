@@ -1,3 +1,4 @@
+#include <Compat/RustRuntimeFFI.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <Helpers/String.hpp>
 #include <LuaCompat.hpp>
@@ -101,7 +102,7 @@ namespace RC::LuaCompat
 
     static auto execute_queued_lua_mod_action(void* data) -> void
     {
-        std::unique_ptr<QueuedLuaModAction> action{static_cast<QueuedLuaModAction*>(data)};
+        auto* action = static_cast<QueuedLuaModAction*>(data);
         if (!action)
         {
             return;
@@ -117,6 +118,11 @@ namespace RC::LuaCompat
         }
 
         action->reinstall ? recreate_lua_mod(program, std::move(mod)) : uninstall_lua_mod(std::move(mod));
+    }
+
+    static auto release_queued_lua_mod_action(void* data) -> void
+    {
+        delete static_cast<QueuedLuaModAction*>(data);
     }
 
     auto find_mod_by_name(StringViewType mod_name, UE4SSProgram::IsInstalled installed_only, UE4SSProgram::IsStarted started_only) -> LuaMod*
@@ -136,7 +142,9 @@ namespace RC::LuaCompat
             return;
         }
 
-        UE4SSProgram::get_program().queue_event(execute_queued_lua_mod_action, new QueuedLuaModAction{std::string{mod_name}, true});
+        UE4SSProgram::get_program().queue_event_owned(
+                ue4ssl_runtime_current_owner(), execute_queued_lua_mod_action,
+                new QueuedLuaModAction{std::string{mod_name}, true}, release_queued_lua_mod_action);
     }
 
     auto queue_reinstall_mod_by_name(StringViewType mod_name) -> void
@@ -152,7 +160,9 @@ namespace RC::LuaCompat
             return;
         }
 
-        UE4SSProgram::get_program().queue_event(execute_queued_lua_mod_action, new QueuedLuaModAction{std::string{mod_name}, false});
+        UE4SSProgram::get_program().queue_event_owned(
+                ue4ssl_runtime_current_owner(), execute_queued_lua_mod_action,
+                new QueuedLuaModAction{std::string{mod_name}, false}, release_queued_lua_mod_action);
     }
 
     auto queue_uninstall_mod_by_name(StringViewType mod_name) -> void

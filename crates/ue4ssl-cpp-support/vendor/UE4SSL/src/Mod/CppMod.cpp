@@ -1,257 +1,75 @@
 #define NOMINMAX
 
-#include <filesystem>
-
+#include <Compat/RustRuntimeFFI.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
-#include <Helpers/String.hpp>
 #include <Mod/CppMod.hpp>
+#include <UE4SSProgram.hpp>
 
 namespace
 {
     auto make_slice(RC::StringViewType value) -> RC::Compat::RustCore::SliceU16
     {
-        return {
-                reinterpret_cast<const uint16_t*>(value.data()),
-                value.size(),
-        };
+        return {reinterpret_cast<const uint16_t*>(value.data()), value.size()};
     }
 
-    auto make_slice(const RC::StringType& value) -> RC::Compat::RustCore::SliceU16
+    auto copy_string(RC::Compat::RustCore::SliceU16 value) -> RC::StringType
     {
-        return make_slice(RC::StringViewType{value.data(), value.size()});
+        if (!value.data || !value.len) return {};
+        return {reinterpret_cast<const RC::CharType*>(value.data), value.len};
     }
-
-    auto make_slice(const std::filesystem::path& value) -> RC::Compat::RustCore::SliceU16
-    {
-        const auto& native = value.native();
-        return {
-                reinterpret_cast<const uint16_t*>(native.data()),
-                native.size(),
-        };
-    }
-
-    enum class CppModFailureCode : uint32_t
-    {
-        None = 0,
-        MissingDirectory = 1,
-        LoadLibraryFailed = 2,
-        MissingLifecycleExports = 3,
-    };
 }
 
 namespace RC
 {
-    auto cppmod_status(Compat::RustCore::CppModHandle* handle) -> Compat::RustCore::CppModRuntimeStatus
+    CppMod::CppMod(UE4SSProgram& program, uint64_t id, StringType&& name, StringType&& path)
+        : Mod(program, std::move(name), std::filesystem::path{std::move(path)}), m_id(id)
     {
-        return ue4ssl_core_cppmod_status(handle);
     }
 
-    CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path)
-        : Mod(program, std::move(mod_name), std::move(mod_path))
-    {
-        m_dlls_path = m_mod_path;
-        m_handle = ue4ssl_core_cppmod_create(make_slice(m_dlls_path), {});
-        const auto status = cppmod_status(m_handle);
-        if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::MissingDirectory)
-            Output::send<LogLevel::Warning>(STR("Could not find the dlls folder for mod {}\n"), m_mod_name);
-        else if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::LoadLibraryFailed)
-            Output::send<LogLevel::Warning>(
-                    STR("Failed to load dll <{}> for mod {}, error code: 0x{:x}\n"), ensure_str(m_dlls_path / STR("main.dll")), m_mod_name, status.last_error);
-        else if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::MissingLifecycleExports)
-            Output::send<LogLevel::Warning>(STR("Failed to find exported mod lifecycle functions for mod {}\n"), m_mod_name);
-    }
+    auto CppMod::set_installable(bool value) -> void { ue4ssl_runtime_mod_action(m_id, 1, value); }
+    auto CppMod::is_installable() const -> bool { return ue4ssl_runtime_mod_status(m_id).installable != 0; }
+    auto CppMod::set_installed(bool value) -> void { ue4ssl_runtime_mod_action(m_id, 2, value); }
+    auto CppMod::is_installed() const -> bool { return ue4ssl_runtime_mod_status(m_id).installed != 0; }
+    auto CppMod::is_started() const -> bool { return ue4ssl_runtime_mod_status(m_id).started != 0; }
+    auto CppMod::set_updates_disabled(bool value) -> void { ue4ssl_runtime_mod_action(m_id, 3, value); }
+    auto CppMod::are_updates_disabled() const -> bool { return ue4ssl_runtime_mod_status(m_id).updates_disabled != 0; }
+    auto CppMod::start_mod() -> void { ue4ssl_runtime_mod_action(m_id, 4, 0); }
+    auto CppMod::uninstall() -> void { ue4ssl_runtime_mod_action(m_id, 5, 0); }
+    auto CppMod::fire_unreal_init() -> void { ue4ssl_runtime_mod_action(m_id, 6, 0); }
+    auto CppMod::fire_ui_init() -> void { ue4ssl_runtime_mod_action(m_id, 7, 0); }
+    auto CppMod::fire_program_start() -> void { ue4ssl_runtime_mod_action(m_id, 8, 0); }
+    auto CppMod::fire_update() -> void { ue4ssl_runtime_mod_action(m_id, 9, 0); }
+    auto CppMod::fire_dll_load(StringViewType name) -> void { ue4ssl_runtime_mod_dll_load(m_id, make_slice(name)); }
+}
 
-    CppMod::CppMod(UE4SSProgram& program, StringType&& mod_name, StringType&& mod_path, StringType&& dll_name) 
-        : Mod(program, std::move(mod_name), std::move(mod_path))
-    {
-        m_dlls_path = m_mod_path;
-        m_handle = ue4ssl_core_cppmod_create(make_slice(m_dlls_path), make_slice(dll_name));
-        const auto status = cppmod_status(m_handle);
-        if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::MissingDirectory)
-            Output::send<LogLevel::Warning>(STR("Could not find the dlls folder for mod {}\n"), m_mod_name);
-        else if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::LoadLibraryFailed)
-            Output::send<LogLevel::Warning>(
-                    STR("Failed to load dll <{}> for mod {}, error code: 0x{:x}\n"), ensure_str(m_dlls_path / dll_name), m_mod_name, status.last_error);
-        else if (static_cast<CppModFailureCode>(status.failure_code) == CppModFailureCode::MissingLifecycleExports)
-            Output::send<LogLevel::Warning>(STR("Failed to find exported mod lifecycle functions for mod {}\n"), m_mod_name);
-    }
-
-    auto CppMod::set_installable(bool value) -> void
-    {
-        ue4ssl_core_cppmod_set_installable(m_handle, value ? 1 : 0);
-    }
-
-    auto CppMod::is_installable() const -> bool
-    {
-        return cppmod_status(m_handle).installable != 0;
-    }
-
-    auto CppMod::set_installed(bool value) -> void
-    {
-        ue4ssl_core_cppmod_set_installed(m_handle, value ? 1 : 0);
-    }
-
-    auto CppMod::is_installed() const -> bool
-    {
-        return cppmod_status(m_handle).installed != 0;
-    }
-
-    auto CppMod::is_started() const -> bool
-    {
-        return cppmod_status(m_handle).started != 0;
-    }
-
-    auto CppMod::set_updates_disabled(bool value) -> void
-    {
-        ue4ssl_core_cppmod_set_updates_disabled(m_handle, value ? 1 : 0);
-    }
-
-    auto CppMod::are_updates_disabled() const -> bool
-    {
-        return cppmod_status(m_handle).updates_disabled != 0;
-    }
-
-    auto CppMod::start_mod() -> void
+extern "C"
+{
+    auto ue4ssl_native_runtime_create_mod_view(uint64_t id,
+                                              RC::Compat::RustCore::SliceU16 name,
+                                              RC::Compat::RustCore::SliceU16 path) -> void*
     {
         try
         {
-            ue4ssl_core_cppmod_start(m_handle);
+            return new RC::CppMod(RC::UE4SSProgram::get_program(), id, copy_string(name), copy_string(path));
         }
-        catch (std::exception& e)
-        {
-            if (!Output::has_internal_error())
-            {
-                Output::send<LogLevel::Warning>(STR("Failed to start mod {}: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            else
-            {
-                printf_s("Internal Error: %s\n", e.what());
-            }
-        }
-        catch (...)
-        {
-            Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception starting mod '{}'\n"), m_mod_name);
-        }
+        catch (...) { return nullptr; }
     }
 
-    auto CppMod::uninstall() -> void
+    auto ue4ssl_native_runtime_destroy_mod_view(void* view) -> void
     {
-        Output::send(STR("Stopping C++ mod '{}' for uninstall\n"), m_mod_name);
-        if (is_started())
-        {
-            try
-            {
-                ue4ssl_core_cppmod_uninstall(m_handle);
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception uninstalling mod '{}': {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception uninstalling mod '{}'\n"), m_mod_name);
-            }
-        }
+        try { delete static_cast<RC::CppMod*>(view); }
+        catch (...) {}
     }
 
-    auto CppMod::fire_unreal_init() -> void
+    auto ue4ssl_native_runtime_log(uint32_t level, RC::Compat::RustCore::SliceU16 message) -> void
     {
-        if (is_started())
+        try
         {
-            try
-            {
-                ue4ssl_core_cppmod_fire_unreal_init(m_handle);
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' on_unreal_init: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' on_unreal_init\n"), m_mod_name);
-            }
+            const auto text = copy_string(message);
+            if (level >= 4) RC::Output::send<RC::LogLevel::Error>(STR("{}"), text);
+            else if (level == 3) RC::Output::send<RC::LogLevel::Warning>(STR("{}"), text);
+            else RC::Output::send(STR("{}"), text);
         }
+        catch (...) {}
     }
-
-    auto CppMod::fire_ui_init() -> void
-    {
-        if (is_started())
-        {
-            try
-            {
-                ue4ssl_core_cppmod_fire_ui_init(m_handle);
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' on_ui_init: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' on_ui_init\n"), m_mod_name);
-            }
-        }
-    }
-
-    auto CppMod::fire_program_start() -> void
-    {
-        if (is_started())
-        {
-            try
-            {
-                ue4ssl_core_cppmod_fire_program_start(m_handle);
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' on_program_start: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' on_program_start\n"), m_mod_name);
-            }
-        }
-    }
-
-    auto CppMod::fire_update() -> void
-    {
-        if (is_started())
-        {
-            try
-            {
-                ue4ssl_core_cppmod_fire_update(m_handle);
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' on_update: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' on_update\n"), m_mod_name);
-            }
-        }
-    }
-
-    auto CppMod::fire_dll_load(StringViewType dll_name) -> void
-    {
-        if (is_started())
-        {
-            try
-            {
-                ue4ssl_core_cppmod_fire_dll_load(m_handle, make_slice(dll_name));
-            }
-            catch (const std::exception& e)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Exception in mod '{}' on_dll_load: {}\n"), m_mod_name, ensure_str(e.what()));
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(STR("[UE4SS] Unknown exception in mod '{}' on_dll_load\n"), m_mod_name);
-            }
-        }
-    }
-
-    CppMod::~CppMod()
-    {
-        ue4ssl_core_cppmod_destroy(m_handle);
-        m_handle = nullptr;
-    }
-} // namespace RC
+}

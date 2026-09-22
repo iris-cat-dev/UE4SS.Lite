@@ -1,75 +1,27 @@
-#include <chrono>
-#include <locale>
-
 #include <DynamicOutput/DebugConsoleDevice.hpp>
-#include <DynamicOutput/Output.hpp>
-
-#define NOMINMAX
-#include <Windows.h>
-#ifdef TEXT
-#undef TEXT
-#endif
+#include <Compat/RustSupportFFI.hpp>
 
 namespace RC::Output
 {
-    static auto log_level_to_color(Color::Color color) -> std::string
+    DebugConsoleDevice::DebugConsoleDevice() : m_sink(ue4ssl_native_log_console_new())
     {
-        switch (color)
+        if (!m_sink)
         {
-        case Color::Default:
-        case Color::NoColor:
-            return "\033[0;0m";
-        case Color::Cyan:
-            return "\033[1;36m";
-        case Color::Yellow:
-            return "\033[1;33m";
-        case Color::Red:
-            return "\033[1;31m";
-        case Color::Green:
-            return "\033[1;32m";
-        case Color::Blue:
-            return "\033[1;94m";
-        case Color::Purple:
-            return "\033[1;35m";
+            THROW_INTERNAL_OUTPUT_ERROR("[DebugConsoleDevice] Failed to create console device")
         }
-
-        return "\033[0;0m";
     }
-
-    auto DebugConsoleDevice::set_windows_console_out_mode_if_needed() const -> void
+    DebugConsoleDevice::~DebugConsoleDevice()
     {
-        if (m_windows_console_mode_set)
+        if (!ue4ssl_native_log_sink_close(m_sink)) { Internal::internal_error = true; }
+    }
+    auto DebugConsoleDevice::has_optional_arg() const -> bool { return true; }
+    auto DebugConsoleDevice::receive(RC::StringViewType content) const -> void { receive_with_optional_arg(content, Color::NoColor); }
+    auto DebugConsoleDevice::receive_with_optional_arg(RC::StringViewType content, int32_t level) const -> void
+    {
+        const auto formatted = m_formatter(content);
+        if (!ue4ssl_native_log_console_write(m_sink, reinterpret_cast<const uint16_t*>(formatted.data()), formatted.size(), level))
         {
-            return;
+            THROW_INTERNAL_OUTPUT_ERROR("[DebugConsoleDevice::receive] Failed to write console output")
         }
-        HANDLE current_console_out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (current_console_out_handle != INVALID_HANDLE_VALUE)
-        {
-            DWORD current_console_out_mode = 0;
-            GetConsoleMode(current_console_out_handle, &current_console_out_mode);
-            SetConsoleMode(current_console_out_handle, current_console_out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-        }
-        m_windows_console_mode_set = true;
     }
-
-    auto DebugConsoleDevice::has_optional_arg() const -> bool
-    {
-        return true;
-    }
-
-    auto DebugConsoleDevice::receive(RC::StringViewType fmt) const -> void
-    {
-        receive_with_optional_arg(fmt, Color::NoColor);
-    }
-
-    auto DebugConsoleDevice::receive_with_optional_arg(RC::StringViewType fmt, [[maybe_unused]] int32_t optional_arg) const -> void
-    {
-        set_windows_console_out_mode_if_needed();
-
-#if ENABLE_OUTPUT_DEVICE_DEBUG_MODE
-        printf_s("DebugConsoleDevice received: %S", m_formatter(fmt).c_str());
-#else
-        printf_s("%s%S\033[0m", log_level_to_color(static_cast<Color::Color>(optional_arg)).c_str(), m_formatter(fmt).c_str());
-#endif
-    }
-} // namespace RC::Output
+}

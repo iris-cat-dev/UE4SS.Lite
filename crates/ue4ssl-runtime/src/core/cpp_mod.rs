@@ -1,4 +1,7 @@
-use std::ffi::{c_char, c_void, OsStr};
+use std::ffi::c_void;
+#[cfg(windows)]
+use std::ffi::{c_char, OsStr};
+#[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -83,6 +86,7 @@ impl Default for CppModHandle {
 }
 
 impl CppModHandle {
+    #[cfg(windows)]
     pub fn load(mod_path: SliceU16, dll_name: SliceU16) -> Box<Self> {
         let mod_path = wide::slice_to_path_buf(mod_path);
         let dll_name = wide::slice_to_os_string(dll_name);
@@ -161,8 +165,6 @@ impl CppModHandle {
                 {
                     handle.failure_code = CppModFailureCode::MissingLifecycleExports;
                     handle.installable = false;
-                    handle.free_library();
-                    handle.remove_dll_directory();
                     return Box::new(handle);
                 }
             } else if !has_cpp_lifecycle
@@ -171,13 +173,16 @@ impl CppModHandle {
             {
                 handle.failure_code = CppModFailureCode::MissingLifecycleExports;
                 handle.installable = false;
-                handle.free_library();
-                handle.remove_dll_directory();
                 return Box::new(handle);
             }
         }
 
         Box::new(handle)
+    }
+
+    #[cfg(all(test, not(windows)))]
+    pub fn load(_mod_path: SliceU16, _dll_name: SliceU16) -> Box<Self> {
+        panic!("Windows DLL loading is unavailable in non-Windows runtime tests");
     }
 
     pub fn status(&self) -> CppModRuntimeStatus {
@@ -189,6 +194,24 @@ impl CppModHandle {
             failure_code: self.failure_code as u32,
             last_error: self.last_error,
         }
+    }
+
+    pub fn owner(&self) -> usize {
+        self.mod_ptr as usize
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_instance(
+        context: *mut c_void,
+        update: unsafe extern "C" fn(*mut c_void),
+    ) -> Box<Self> {
+        let mut handle = Self::default();
+        handle.mod_ptr = context;
+        handle.rust_abi = true;
+        handle.installed = true;
+        handle.started = true;
+        handle.rust_on_update_func = update as *mut c_void;
+        Box::new(handle)
     }
 
     pub fn set_installable(&mut self, value: bool) {
@@ -204,8 +227,7 @@ impl CppModHandle {
     }
 
     pub fn start(&mut self) {
-        if !self.installable {
-            self.started = false;
+        if self.started || !self.installable {
             return;
         }
 
@@ -220,18 +242,16 @@ impl CppModHandle {
     }
 
     pub fn uninstall(&mut self) {
-        if !self.mod_ptr.is_null() {
-            if self.rust_abi && !self.rust_uninstall_mod_func.is_null() {
-                unsafe { call_rust_mod_fn(self.rust_uninstall_mod_func, self.mod_ptr) };
-            } else if !self.uninstall_mod_func.is_null() {
-                unsafe {
-                    ue4ssl_native_cppmod_call_uninstall(self.uninstall_mod_func, self.mod_ptr)
-                };
-            }
-        }
-        self.mod_ptr = std::ptr::null_mut();
+        let mod_ptr = std::mem::replace(&mut self.mod_ptr, std::ptr::null_mut());
         self.started = false;
         self.installed = false;
+        if !mod_ptr.is_null() {
+            if self.rust_abi && !self.rust_uninstall_mod_func.is_null() {
+                unsafe { call_rust_mod_fn(self.rust_uninstall_mod_func, mod_ptr) };
+            } else if !self.uninstall_mod_func.is_null() {
+                unsafe { ue4ssl_native_cppmod_call_uninstall(self.uninstall_mod_func, mod_ptr) };
+            }
+        }
     }
 
     pub fn fire_unreal_init(&mut self) {
@@ -310,6 +330,7 @@ impl CppModHandle {
         }
     }
 
+    #[cfg(windows)]
     unsafe fn free_library(&mut self) {
         if !self.main_dll_module.is_null() {
             ue4ssl_native_cppmod_free_library(self.main_dll_module);
@@ -317,11 +338,28 @@ impl CppModHandle {
         }
     }
 
+    #[cfg(windows)]
     unsafe fn remove_dll_directory(&mut self) {
         if !self.dlls_path_cookie.is_null() {
             let _ = RemoveDllDirectory(self.dlls_path_cookie);
             self.dlls_path_cookie = std::ptr::null_mut();
         }
+    }
+
+    #[cfg(all(test, not(windows)))]
+    unsafe fn free_library(&mut self) {
+        assert!(
+            self.main_dll_module.is_null(),
+            "non-Windows tests cannot unload a Windows DLL"
+        );
+    }
+
+    #[cfg(all(test, not(windows)))]
+    unsafe fn remove_dll_directory(&mut self) {
+        assert!(
+            self.dlls_path_cookie.is_null(),
+            "non-Windows tests cannot own a Windows DLL directory cookie"
+        );
     }
 }
 
@@ -334,6 +372,7 @@ impl Drop for CppModHandle {
     }
 }
 
+#[cfg(windows)]
 fn path_to_wide_null(path: &Path) -> Vec<u16> {
     path.as_os_str()
         .encode_wide()
@@ -342,7 +381,7 @@ fn path_to_wide_null(path: &Path) -> Vec<u16> {
 }
 
 fn path_to_wide(path: &Path) -> Vec<u16> {
-    path.as_os_str().encode_wide().collect()
+    wide::os_str_to_utf16(path.as_os_str())
 }
 
 unsafe fn call_rust_mod_fn(fn_ptr: *mut c_void, mod_ptr: *mut c_void) {
@@ -367,6 +406,7 @@ unsafe fn call_optional_rust_dll_load_fn(
     }
 }
 
+#[cfg(windows)]
 #[link(name = "kernel32")]
 extern "system" {
     fn AddDllDirectory(new_directory: *const u16) -> *mut c_void;

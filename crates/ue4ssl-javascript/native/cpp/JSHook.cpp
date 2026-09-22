@@ -2137,23 +2137,23 @@ namespace RC::JSScript
 
         if (with_ctrl || with_shift || with_alt)
         {
-            program.register_keydown_event(
+            program.register_keydown_event_owned(
                 static_cast<Input::Key>(key),
                 modifier_keys,
                 [raw_key_bind, queue_keybind_callback]() {
                     queue_keybind_callback(raw_key_bind);
                 },
-                js_keybind_custom_data
+                js_keybind_custom_data, reinterpret_cast<uintptr_t>(this)
             );
         }
         else
         {
-            program.register_keydown_event(
+            program.register_keydown_event_owned(
                 static_cast<Input::Key>(key),
                 [raw_key_bind, queue_keybind_callback]() {
                     queue_keybind_callback(raw_key_bind);
                 },
-                js_keybind_custom_data
+                js_keybind_custom_data, reinterpret_cast<uintptr_t>(this)
             );
         }
 

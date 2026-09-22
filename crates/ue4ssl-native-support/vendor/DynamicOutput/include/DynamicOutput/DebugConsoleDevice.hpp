@@ -1,44 +1,24 @@
 #ifndef UE4SS_REWRITTEN_DEBUGCONSOLEDEVICE_HPP
 #define UE4SS_REWRITTEN_DEBUGCONSOLEDEVICE_HPP
 
-#include <cstdio>
-
+#include <cstdint>
 #include <DynamicOutput/Common.hpp>
-#include <DynamicOutput/Macros.hpp>
 #include <DynamicOutput/OutputDevice.hpp>
 
 namespace RC::Output
 {
-    // Very simple class that outputs to stdout
     class RC_DYNOUT_API DebugConsoleDevice : public OutputDevice
     {
-      private:
-        mutable bool m_windows_console_mode_set{};
-
-      private:
-        auto set_windows_console_out_mode_if_needed() const -> void;
-
+        uint64_t m_sink{};
       public:
-      public:
-#if ENABLE_OUTPUT_DEVICE_DEBUG_MODE
-        DebugConsoleDevice()
-        {
-            std::puts("DebugConsoleDevice opening...");
-        }
-
-        ~DebugConsoleDevice() override
-        {
-            std::puts("DebugConsoleDevice closing...");
-        }
-#else
-        ~DebugConsoleDevice() override = default;
-#endif
-
-      public:
+        DebugConsoleDevice();
+        DebugConsoleDevice(const DebugConsoleDevice&) = delete;
+        auto operator=(const DebugConsoleDevice&) -> DebugConsoleDevice& = delete;
+        ~DebugConsoleDevice() override;
         auto has_optional_arg() const -> bool override;
-        auto receive(RC::StringViewType fmt) const -> void override;
-        auto receive_with_optional_arg(RC::StringViewType fmt, int32_t optional_arg = 0) const -> void override;
+        auto receive(RC::StringViewType content) const -> void override;
+        auto receive_with_optional_arg(RC::StringViewType content, int32_t level = 0) const -> void override;
     };
-} // namespace RC::Output
+}
 
 #endif // UE4SS_REWRITTEN_DEBUGCONSOLEDEVICE_HPP

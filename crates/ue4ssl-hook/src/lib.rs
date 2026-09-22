@@ -61,7 +61,8 @@ extern "system" {
         cb: Dword,
         lpcb_needed: *mut Dword,
     ) -> Bool;
-    fn GetModuleHandleW(lp_module_name: Lpcwstr) -> Hmodule;
+    fn GetModuleHandleExW(flags: Dword, name_or_address: Lpcwstr, module: *mut Hmodule) -> Bool;
+    fn FreeLibrary(module: Hmodule) -> Bool;
 }
 
 #[repr(C)]
@@ -205,7 +206,29 @@ struct IatHookHandle {
     original: u64,
     user_original: *mut u64,
     thunk: *mut usize,
+    source_module: Option<RetainedModule>,
     hooked: bool,
+}
+
+struct RetainedModule(Hmodule);
+
+impl RetainedModule {
+    unsafe fn acquire(flags: Dword, name_or_address: Lpcwstr) -> Option<Self> {
+        let mut module = null_mut();
+        if GetModuleHandleExW(flags, name_or_address, &mut module) == FALSE {
+            None
+        } else {
+            Some(Self(module))
+        }
+    }
+}
+
+impl Drop for RetainedModule {
+    fn drop(&mut self) {
+        unsafe {
+            FreeLibrary(self.0);
+        }
+    }
 }
 
 fn ffi_ptr<T, F>(f: F) -> *mut T
@@ -595,6 +618,7 @@ impl IatHookHandle {
             original: 0,
             user_original,
             thunk: null_mut(),
+            source_module: None,
             hooked: false,
         })
     }
@@ -604,17 +628,21 @@ impl IatHookHandle {
             return true;
         }
 
-        let Some(thunk) = self.find_iat_thunk() else {
+        let Some((thunk, source_module)) = self.find_iat_thunk() else {
             return false;
         };
 
-        self.original = *thunk as u64;
+        self.original = (&*thunk.cast::<std::sync::atomic::AtomicUsize>())
+            .load(std::sync::atomic::Ordering::Acquire) as u64;
+        // Publish the original before any thread can enter the replacement.
+        (&*self.user_original.cast::<std::sync::atomic::AtomicU64>())
+            .store(self.original, std::sync::atomic::Ordering::Release);
         if !write_pointer_value(thunk, self.callback as usize) {
             return false;
         }
 
         self.thunk = thunk;
-        *self.user_original = self.original;
+        self.source_module = Some(source_module);
         self.hooked = true;
         true
     }
@@ -628,20 +656,23 @@ impl IatHookHandle {
             return false;
         }
 
-        *self.user_original = 0;
+        // A thread may already have fetched the replacement from the IAT.
+        // Keep its original callable valid after unhook; the caller owns this slot.
         self.thunk = null_mut();
         self.original = 0;
         self.hooked = false;
+        // Reset hook state before FreeLibrary can run the importing DLL's detach code.
+        drop(self.source_module.take());
         true
     }
 
-    unsafe fn find_iat_thunk(&self) -> Option<*mut usize> {
+    unsafe fn find_iat_thunk(&self) -> Option<(*mut usize, RetainedModule)> {
         if !self.module_name.is_empty() {
-            let module = GetModuleHandleW(self.module_name.as_ptr());
-            if module.is_null() {
-                return None;
-            }
-            return find_iat_thunk_in_module(module, &self.dll_name, &self.api_name);
+            // Acquire by name in one loader operation: GetModuleHandleW followed
+            // by pinning its raw result would leave an unload/reuse window.
+            let module = RetainedModule::acquire(0, self.module_name.as_ptr())?;
+            let thunk = find_iat_thunk_in_module(module.0, &self.dll_name, &self.api_name)?;
+            return Some((thunk, module));
         }
 
         let process = GetCurrentProcess();
@@ -656,9 +687,18 @@ impl IatHookHandle {
             return None;
         }
 
-        for module in modules {
-            if let Some(thunk) = find_iat_thunk_in_module(module, &self.dll_name, &self.api_name) {
-                return Some(thunk);
+        for address in modules {
+            if address.is_null() {
+                continue;
+            }
+            // Enumeration supplies addresses, not references. The DLL may have
+            // unloaded since that snapshot, so retain it before reading PE data.
+            let Some(module) = RetainedModule::acquire(0x4, address.cast()) else {
+                continue;
+            };
+            if let Some(thunk) = find_iat_thunk_in_module(module.0, &self.dll_name, &self.api_name)
+            {
+                return Some((thunk, module));
             }
         }
 
@@ -669,14 +709,32 @@ impl IatHookHandle {
 impl Drop for IatHookHandle {
     fn drop(&mut self) {
         unsafe {
-            let _ = self.unhook();
+            if self.hooked && !self.unhook() {
+                // A failed restore leaves the IAT live. Preserve its storage even
+                // if the caller destroys the backend; leaking is safer than a
+                // future write/call through an unloaded or recycled image.
+                if let Some(module) = self.source_module.take() {
+                    std::mem::forget(module);
+                }
+            }
         }
     }
 }
 
 unsafe fn write_pointer_value(address: *mut usize, value: usize) -> bool {
-    let bytes = value.to_ne_bytes();
-    write_executable_memory(address.cast(), &bytes)
+    if address.is_null() || address as usize % std::mem::align_of::<usize>() != 0 {
+        return false;
+    }
+    let mut previous = 0;
+    let size = std::mem::size_of::<usize>();
+    if VirtualProtect(address.cast(), size, PAGE_EXECUTE_READWRITE, &mut previous) == FALSE {
+        return false;
+    }
+    (&*address.cast::<std::sync::atomic::AtomicUsize>())
+        .store(value, std::sync::atomic::Ordering::SeqCst);
+    let mut unused = 0;
+    let _ = VirtualProtect(address.cast(), size, previous, &mut unused);
+    true
 }
 
 fn eq_ignore_ascii_case(left: &str, right: &str) -> bool {
@@ -920,6 +978,217 @@ pub fn force_link_exports() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[link(name = "kernel32", kind = "raw-dylib")]
+    extern "system" {
+        fn LoadLibraryW(path: *const u16) -> Hmodule;
+        fn GetProcAddress(module: Hmodule, name: *const c_char) -> *mut c_void;
+        fn GetLastError() -> Dword;
+        fn SetLastError(error: Dword);
+    }
+
+    struct IatFixture {
+        path: PathBuf,
+        module: Hmodule,
+    }
+
+    impl IatFixture {
+        fn load() -> Self {
+            // A real, relocatable AMD64 DLL, with no DllMain and one export:
+            // probe() jumps through its own kernel32!GetLastError IAT entry.
+            // Keeping the PE fixture here avoids relying on a system DLL's
+            // changing imports or on a compiler executable in the test PATH.
+            let mut image = vec![0u8; 0x400];
+            let put16 = |image: &mut [u8], at, value: u16| {
+                image[at..at + 2].copy_from_slice(&value.to_le_bytes());
+            };
+            let put32 = |image: &mut [u8], at, value: u32| {
+                image[at..at + 4].copy_from_slice(&value.to_le_bytes());
+            };
+            let put64 = |image: &mut [u8], at, value: u64| {
+                image[at..at + 8].copy_from_slice(&value.to_le_bytes());
+            };
+            image[..2].copy_from_slice(b"MZ");
+            put32(&mut image, 0x3c, 0x80);
+            image[0x80..0x84].copy_from_slice(b"PE\0\0");
+            put16(&mut image, 0x84, 0x8664);
+            put16(&mut image, 0x86, 1);
+            put16(&mut image, 0x94, 0xf0);
+            put16(&mut image, 0x96, 0x2022);
+            let optional = 0x98;
+            put16(&mut image, optional, 0x20b);
+            put32(&mut image, optional + 4, 0x200);
+            put32(&mut image, optional + 20, 0x1000);
+            put64(&mut image, optional + 24, 0x180000000);
+            put32(&mut image, optional + 32, 0x1000);
+            put32(&mut image, optional + 36, 0x200);
+            put16(&mut image, optional + 40, 6);
+            put16(&mut image, optional + 48, 6);
+            put32(&mut image, optional + 56, 0x2000);
+            put32(&mut image, optional + 60, 0x200);
+            put16(&mut image, optional + 68, 3);
+            put16(&mut image, optional + 70, 0x140);
+            put64(&mut image, optional + 72, 0x100000);
+            put64(&mut image, optional + 80, 0x1000);
+            put64(&mut image, optional + 88, 0x100000);
+            put64(&mut image, optional + 96, 0x1000);
+            put32(&mut image, optional + 108, 16);
+            for (index, rva, size) in [
+                (0, 0x1040, 0x80),
+                (1, 0x1100, 40),
+                (5, 0x1180, 12),
+                (12, 0x1150, 16),
+            ] {
+                put32(&mut image, optional + 112 + index * 8, rva);
+                put32(&mut image, optional + 116 + index * 8, size);
+            }
+            image[0x188..0x18d].copy_from_slice(b".text");
+            put32(&mut image, 0x190, 0x200);
+            put32(&mut image, 0x194, 0x1000);
+            put32(&mut image, 0x198, 0x200);
+            put32(&mut image, 0x19c, 0x200);
+            put32(&mut image, 0x1ac, 0xe0000020);
+            image[0x200..0x206].copy_from_slice(&[0xff, 0x25, 0x4a, 0x01, 0, 0]);
+            for (offset, value) in [
+                (12, 0x10a0),
+                (16, 1),
+                (20, 1),
+                (24, 1),
+                (28, 0x1080),
+                (32, 0x1088),
+                (36, 0x1090),
+            ] {
+                put32(&mut image, 0x240 + offset, value);
+            }
+            put32(&mut image, 0x280, 0x1000);
+            put32(&mut image, 0x288, 0x1098);
+            image[0x298..0x29e].copy_from_slice(b"probe\0");
+            image[0x2a0..0x2ad].copy_from_slice(b"iat-test.dll\0");
+            put32(&mut image, 0x300, 0x1140);
+            put32(&mut image, 0x30c, 0x1130);
+            put32(&mut image, 0x310, 0x1150);
+            image[0x330..0x33d].copy_from_slice(b"kernel32.dll\0");
+            put64(&mut image, 0x340, 0x1160);
+            put64(&mut image, 0x350, 0x1160);
+            image[0x362..0x36f].copy_from_slice(b"GetLastError\0");
+            put32(&mut image, 0x380, 0x1000);
+            put32(&mut image, 0x384, 12);
+
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "ue4ssl-iat-{}-{timestamp}-{}.dll",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let mut fixture = Self {
+                path,
+                module: null_mut(),
+            };
+            std::fs::write(&fixture.path, image).unwrap();
+            fixture.module = unsafe { LoadLibraryW(fixture.wide_path().as_ptr()) };
+            assert!(
+                !fixture.module.is_null(),
+                "fixture DLL load failed: {}",
+                unsafe { GetLastError() }
+            );
+            fixture
+        }
+
+        fn wide_path(&self) -> Vec<u16> {
+            self.path.as_os_str().encode_wide().chain(Some(0)).collect()
+        }
+
+        fn is_loaded(&self) -> bool {
+            let mut module = null_mut();
+            // UNCHANGED_REFCOUNT: observing the module must not keep it alive.
+            unsafe { GetModuleHandleExW(0x2, self.wide_path().as_ptr(), &mut module) != FALSE }
+        }
+
+        fn release_caller(&mut self) {
+            let module = std::mem::replace(&mut self.module, null_mut());
+            assert_ne!(unsafe { FreeLibrary(module) }, FALSE);
+        }
+    }
+
+    impl Drop for IatFixture {
+        fn drop(&mut self) {
+            if !self.module.is_null() {
+                unsafe {
+                    FreeLibrary(self.module);
+                }
+            }
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+
+    unsafe extern "system" fn replacement_last_error() -> Dword {
+        0x12345678
+    }
+
+    #[test]
+    fn iat_hook_keeps_importing_dll_loaded_until_unhook() {
+        let mut fixture = IatFixture::load();
+        let probe_address = unsafe { GetProcAddress(fixture.module, b"probe\0".as_ptr().cast()) };
+        assert!(!probe_address.is_null());
+        let probe: unsafe extern "system" fn() -> Dword =
+            unsafe { std::mem::transmute(probe_address) };
+        unsafe {
+            SetLastError(0x11223344);
+        }
+        assert_eq!(unsafe { probe() }, 0x11223344);
+        let original = AtomicU64::new(0);
+        let mut hook = unsafe {
+            IatHookHandle::new(
+                b"kernel32.dll\0".as_ptr().cast(),
+                b"GetLastError\0".as_ptr().cast(),
+                replacement_last_error as *const () as u64,
+                original.as_ptr(),
+                fixture.wide_path().as_ptr(),
+            )
+            .unwrap()
+        };
+        assert!(unsafe { hook.hook() });
+        fixture.release_caller();
+        assert!(
+            fixture.is_loaded(),
+            "the live IAT hook must retain its importing DLL"
+        );
+        assert_eq!(unsafe { probe() }, 0x12345678);
+        assert!(unsafe { hook.unhook() });
+        assert!(
+            !fixture.is_loaded(),
+            "successful unhook must release the importing DLL"
+        );
+    }
+
+    #[test]
+    fn missing_import_does_not_retain_the_candidate_dll() {
+        let mut fixture = IatFixture::load();
+        let original = AtomicU64::new(0);
+        let mut hook = unsafe {
+            IatHookHandle::new(
+                b"kernel32.dll\0".as_ptr().cast(),
+                b"ue4ssl_missing_import\0".as_ptr().cast(),
+                replacement_last_error as *const () as u64,
+                original.as_ptr(),
+                fixture.wide_path().as_ptr(),
+            )
+            .unwrap()
+        };
+        assert!(!unsafe { hook.hook() });
+        fixture.release_caller();
+        assert!(
+            !fixture.is_loaded(),
+            "a failed import search must release its temporary reference"
+        );
+    }
 
     #[test]
     fn absolute_jump_bytes_encode_mov_rax_jmp_rax() {

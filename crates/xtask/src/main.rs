@@ -4,10 +4,11 @@ use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use native::{
-    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, built_native_mod_binary_path,
-    built_native_mod_pdb_path, core_artifacts, default_artifacts, discover_native_mods,
-    package_profile_dir, package_stage_dir, runtime_artifacts, select_native_mods,
-    write_generated_mod_workspace, ArtifactSpec, CargoProfile, NativeModSpec, PackageKind,
+    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path,
+    built_native_mod_binary_path, built_native_mod_pdb_path, core_artifacts, default_artifacts,
+    discover_native_mods, package_profile_dir, package_stage_dir, runtime_artifacts,
+    select_native_mods, write_generated_mod_workspace, ArtifactSpec, CargoProfile, NativeModSpec,
+    PackageKind,
 };
 use xshell::{cmd, Shell};
 
@@ -265,6 +266,14 @@ fn sync_abi() -> Result<()> {
     write_if_changed(
         &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/GeneratedHostAbi.hpp"),
         &ue4ssl_abi::render_host_header(),
+    )?;
+    write_if_changed(
+        &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/RustRuntimeFFI.hpp"),
+        &ue4ssl_abi::render_runtime_header(),
+    )?;
+    write_if_changed(
+        &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/RustSupportFFI.hpp"),
+        &ue4ssl_abi::render_support_header(),
     )?;
     Ok(())
 }
@@ -723,7 +732,9 @@ fn stage_resource_root(source: &Utf8Path, mod_dir: &Utf8Path) -> Result<()> {
     if source.is_dir() {
         copy_tree_contents(source, mod_dir)
     } else {
-        let name = source.file_name().context("resource path is missing file name")?;
+        let name = source
+            .file_name()
+            .context("resource path is missing file name")?;
         copy_file(source, &mod_dir.join(name))
     }
 }

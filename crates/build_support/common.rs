@@ -442,6 +442,14 @@ pub fn generate_abi_headers(out_dir: &Path) -> io::Result<GeneratedAbiIncludeRoo
         &ue4ssl_abi::render_host_header(),
     )?;
     write_if_changed(
+        &ue4ssl_include.join("Compat").join("RustRuntimeFFI.hpp"),
+        &ue4ssl_abi::render_runtime_header(),
+    )?;
+    write_if_changed(
+        &ue4ssl_include.join("Compat").join("RustSupportFFI.hpp"),
+        &ue4ssl_abi::render_support_header(),
+    )?;
+    write_if_changed(
         &unreal_include
             .join("Unreal")
             .join("Compat")

@@ -29,7 +29,8 @@ fn main() {
 
     let unreal_root = unreal_root(&workspace_root);
     let unreal_src = unreal_root.join("src");
-    let include_dirs = unreal_compile_include_dirs(&workspace_root, &generated.unreal_include);
+    let mut include_dirs = unreal_compile_include_dirs(&workspace_root, &generated.unreal_include);
+    include_dirs.push(generated.ue4ssl_include.clone());
 
     require_paths_exist(
         "ue4ssl-unreal-support inputs",

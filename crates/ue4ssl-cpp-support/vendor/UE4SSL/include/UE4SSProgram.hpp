@@ -8,6 +8,7 @@
 
 #include <Common.hpp>
 #include <CrashDumper.hpp>
+#include <Compat/RustRuntimeFFI.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <Input/Handler.hpp>
 #include <MProgram.hpp>
@@ -61,15 +62,6 @@ namespace RC
         uint64_t safety_padding[8]{0};
     };
 
-    struct KeyDownEventData
-    {
-        // Custom data from the C++ mod.
-        // The 'custom_data' variable to UE4SSProgram::register_keydown_event will be used to determine the type of custom_data2.
-        uint8_t custom_data{};
-
-        // The C++ mod that created this event.
-        CppUserModBase* mod{};
-    };
 
     class UE4SSProgram : public MProgram
     {
@@ -85,12 +77,8 @@ namespace RC
         RC_UE4SS_API static SettingsManager settings_manager;
         static inline bool unreal_is_shutting_down{};
 
-      public:
-        bool m_is_program_started;
-
       protected:
         Input::Handler m_input_handler{L"ConsoleWindowClass", L"UnrealWindow"};
-        std::jthread m_event_loop;
 
       public:
         std::jthread m_render_thread;
@@ -115,37 +103,14 @@ namespace RC
         //GUI::DebuggingGUI m_debugging_gui{};
 
         using EventCallable = void (*)(void* data);
-        struct Event
-        {
-            EventCallable callable{};
-            void* data{};
-        };
-        std::vector<Event> m_queued_events{};
-        std::mutex m_event_queue_mutex{};
-
-      private:
-        std::unique_ptr<PLH::IatHook> m_load_library_a_hook;
-        uint64_t m_hook_trampoline_load_library_a;
-
-        std::unique_ptr<PLH::IatHook> m_load_library_ex_a_hook;
-        uint64_t m_hook_trampoline_load_library_ex_a;
-
-        std::unique_ptr<PLH::IatHook> m_load_library_w_hook;
-        uint64_t m_hook_trampoline_load_library_w;
-
-        std::unique_ptr<PLH::IatHook> m_load_library_ex_w_hook;
-        uint64_t m_hook_trampoline_load_library_ex_w;
 
       public:
-        std::vector<std::unique_ptr<Mod>> m_mods;
 
         RecognizableStruct m_shared_functions{};
 
         static inline UE4SSProgram* s_program{};
 
         bool m_has_game_specific_config{};
-        bool m_processing_events{};
-        bool m_pause_events_processing{};
 
       public:
         enum class IsInstalled
@@ -179,23 +144,6 @@ namespace RC
         auto setup_unreal() -> void;
         auto load_unreal_offsets_from_file() -> void;
         auto on_program_start() -> void;
-        auto setup_unreal_properties() -> void;
-
-      protected:
-        auto update() -> void;
-        auto setup_cpp_mods() -> void;
-        enum class IsInitialStartup
-        {
-            Yes,
-            No
-        };
-        auto start_cpp_mods(IsInitialStartup = IsInitialStartup::No) -> void;
-        auto setup_mods() -> void;
-        auto uninstall_mods() -> void;
-        auto fire_unreal_init_for_cpp_mods() -> void;
-        auto fire_ui_init_for_cpp_mods() -> void;
-        auto fire_program_start_for_cpp_mods() -> void;
-        auto fire_dll_load_for_cpp_mods(StringViewType dll_name) -> void;
 
       public:
         auto init() -> void;
@@ -208,11 +156,11 @@ namespace RC
         RC_UE4SS_API auto get_mods_directory() -> RC::StringType;
         RC_UE4SS_API auto get_legacy_root_directory() -> RC::StringType;
         RC_UE4SS_API auto queue_event(EventCallable callable, void* data) -> void;
+        RC_UE4SS_API auto queue_event_owned(uintptr_t owner, EventCallable callable, void* data, EventCallable release) -> bool;
         RC_UE4SS_API auto is_queue_empty() -> bool;
-        RC_UE4SS_API auto get_all_input_events(std::function<void(Input::KeySet&)> callback) -> void;
         RC_UE4SS_API auto can_process_events() -> bool
         {
-            return m_processing_events;
+            return ue4ssl_core_get_program_flags().processing_events != 0;
         }
 
       public:
@@ -223,12 +171,17 @@ namespace RC
                                                  const Input::EventCallbackCallable&,
                                                  uint8_t custom_data = 0,
                                                  void* custom_data2 = nullptr) -> void;
+        RC_UE4SS_API auto register_keydown_event_owned(Input::Key, const Input::EventCallbackCallable&, uint8_t kind, uintptr_t owner) -> uint64_t;
+        RC_UE4SS_API auto register_keydown_event_owned(Input::Key,
+                                                     const Input::Handler::ModifierKeyArray&,
+                                                     const Input::EventCallbackCallable&,
+                                                     uint8_t kind,
+                                                     uintptr_t owner) -> uint64_t;
+        RC_UE4SS_API auto unregister_input_owner(uintptr_t owner) -> void;
         RC_UE4SS_API auto is_keydown_event_registered(Input::Key) -> bool;
         RC_UE4SS_API auto is_keydown_event_registered(Input::Key, const Input::Handler::ModifierKeyArray&) -> bool;
 
       private:
-        static auto install_cpp_mods() -> void;
-
         using FMBNI_ExtraPredicate = std::function<bool(Mod*)>;
         static auto find_mod_by_name_internal(StringViewType mod_name,
                                               IsInstalled = IsInstalled::No,
@@ -259,16 +212,10 @@ namespace RC
             return find_mod_by_name<CppMod>(ensure_str(mod_name), is_installed, is_started);
         }
 
-        static auto static_cleanup() -> void;
         RC_UE4SS_API static auto get_program() -> UE4SSProgram&
         {
             return *s_program;
         }
 
-      private:
-        friend void* HookedLoadLibraryA(const char* dll_name);
-        friend void* HookedLoadLibraryExA(const char* dll_name, void* file, int32_t flags);
-        friend void* HookedLoadLibraryW(const wchar_t* dll_name);
-        friend void* HookedLoadLibraryExW(const wchar_t* dll_name, void* file, int32_t flags);
     };
 } // namespace RC

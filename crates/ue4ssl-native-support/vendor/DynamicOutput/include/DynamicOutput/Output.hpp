@@ -1,431 +1,150 @@
 #ifndef UE4SS_REWRITTEN_OUTPUT_HPP
 #define UE4SS_REWRITTEN_OUTPUT_HPP
 
-#include <array>
 #include <format>
 #include <memory>
-#include <source_location>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <utility>
 #include <typeinfo>
-#include <vector>
+#include <utility>
 #include <DynamicOutput/Common.hpp>
 #include <DynamicOutput/Macros.hpp>
 #include <DynamicOutput/OutputDevice.hpp>
+#include <Compat/RustSupportFFI.hpp>
 
 namespace RC::Output
 {
     namespace detail
     {
         template <typename... FmtArgs>
-        auto format_message(RC::StringViewType content, FmtArgs&&... fmt_args) -> RC::StringType
+        auto format_message(RC::StringViewType content, FmtArgs&&... args) -> RC::StringType
         {
 #if RC_IS_ANSI == 1
-            return std::vformat(content, std::make_format_args(std::forward<FmtArgs>(fmt_args)...));
+            return std::vformat(content, std::make_format_args(args...));
 #else
-            return std::vformat(content, std::make_wformat_args(std::forward<FmtArgs>(fmt_args)...));
+            return std::vformat(content, std::make_wformat_args(args...));
 #endif
         }
-    } // namespace detail
+        RC_DYNOUT_API auto add_device(uint64_t group, std::unique_ptr<OutputDevice> device) -> OutputDevice&;
+        RC_DYNOUT_API auto send_to_group(uint64_t group, RC::StringViewType content, int32_t level) -> void;
+
+        template <typename DeviceType>
+        auto get_device(uint64_t group) -> DeviceType&
+        {
+            auto* device = static_cast<DeviceType*>(ue4ssl_native_log_group_find(group, nullptr, [](void* data, void*) noexcept -> void* {
+                return dynamic_cast<DeviceType*>(static_cast<OutputDevice*>(data));
+            }));
+            if (!device)
+            {
+                THROW_INTERNAL_OUTPUT_ERROR(std::format("[Output::get_device] Unable to find device of type: {}", typeid(DeviceType).name()))
+            }
+            return *device;
+        }
+    }
 
     template <typename SupposedEnum>
     concept EnumType = std::is_enum_v<SupposedEnum>;
 
-    using OutputDevicesContainerType = std::vector<std::unique_ptr<OutputDevice>>;
-
     auto RC_DYNOUT_API has_internal_error() -> bool;
 
-    template <typename DeviceType>
-    auto get_device_internal(OutputDevicesContainerType& device_container) -> DeviceType&
-    {
-        if (device_container.empty())
-        {
-            THROW_INTERNAL_OUTPUT_ERROR("[Output::get_device_internal] tried to get_device but there were no devices.")
-        }
-
-        DeviceType* ret{};
-        for (auto& device : device_container)
-        {
-            ret = dynamic_cast<DeviceType*>(device.get());
-            if (ret)
-            {
-                break;
-            }
-        }
-
-        if (!ret)
-        {
-            THROW_INTERNAL_OUTPUT_ERROR(
-                    std::format("[Output::get_device_internal] tried to get_device but was unable to find device of type: {}", typeid(DeviceType).name()))
-        }
-        return *ret;
-    }
-
-    // Static container to hold default values
     class DefaultTargets
     {
-      private:
-        // Is empty unless set_default_device or set_default_devices is called
-        // If empty, will cause an exception to be thrown if the static send() function is called
-        // Otherwise it contains all of the devices that will receive output when the static send() function is called
-        // Keep in mind that this is static so these will stay alive until main() ends or until you manually call the close_devices() function
-        static inline OutputDevicesContainerType default_devices{};
-        static inline int32_t default_log_level{LogLevel::Normal};
-
       public:
-        RC_DYNOUT_API auto static set_default_log_level(int32_t log_level) -> void;
+        RC_DYNOUT_API auto static get_group() -> uint64_t;
+        RC_DYNOUT_API auto static set_default_log_level(int32_t level) -> void;
         RC_DYNOUT_API auto static get_default_log_level() -> int32_t;
-        RC_DYNOUT_API auto static get_default_devices_ref() -> OutputDevicesContainerType&;
         RC_DYNOUT_API auto static close_all_default_devices() -> void;
     };
 
-    // RAII class for making output devices not immediately close after calling send()
-    // Cannot be used with default devices as those are already fully persistent, simply use the static Output::send() function instead
     template <typename OutputDeviceType, typename... OutputDeviceTypes>
     class Targets
     {
-      private:
-        // Is empty unless send_to was called
-        // It then contains all of the devices that will receive output until either
-        // A. The object leaves scope
-        // or
-        // B. close_devices() is manually called on the object
-        OutputDevicesContainerType m_opened_devices{};
-
-      private:
-        template <typename DeviceType>
-        auto open_device() -> void
-        {
-            m_opened_devices.emplace_back(std::make_unique<DeviceType>());
-        }
-
-        template <typename DeviceType, typename DeviceTypeWorkaround, typename... DeviceTypes>
-        auto open_device() -> void
-        {
-            m_opened_devices.emplace_back(std::make_unique<DeviceType>());
-            open_device<DeviceTypeWorkaround, DeviceTypes...>();
-        }
-
+        uint64_t m_group{};
       public:
-        Targets()
+        Targets() : m_group(ue4ssl_native_log_group_new())
         {
-            open_device<OutputDeviceType, OutputDeviceTypes...>();
-        };
-
-        template <EnumType OptionalArg>
-        auto send(RC::StringViewType content, OptionalArg optional_arg) -> void
-        {
-            if (m_opened_devices.empty())
+            try
             {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
+                detail::add_device(m_group, std::make_unique<OutputDeviceType>());
+                (detail::add_device(m_group, std::make_unique<OutputDeviceTypes>()), ...);
             }
-
-            for (const auto& device : m_opened_devices)
+            catch (...)
             {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(content, static_cast<int32_t>(optional_arg));
-                }
-                else
-                {
-                    device->receive(content);
-                }
+                ue4ssl_native_log_group_destroy(m_group);
+                throw;
             }
         }
+        Targets(const Targets&) = delete;
+        auto operator=(const Targets&) -> Targets& = delete;
+        ~Targets() { ue4ssl_native_log_group_destroy(m_group); }
 
         template <typename... FmtArgs>
-        auto send(RC::StringViewType content, FmtArgs... fmt_args) -> void
+        auto send(RC::StringViewType content, FmtArgs... args) -> void
         {
-            if (m_opened_devices.empty())
-            {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
-            }
-
-            for (const auto& device : m_opened_devices)
-            {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(detail::format_message(content, fmt_args...), 0);
-                }
-                else
-                {
-                    device->receive(detail::format_message(content, fmt_args...));
-                }
-            }
+            detail::send_to_group(m_group, detail::format_message(content, args...), 0);
         }
-
         template <EnumType OptionalArg, typename... FmtArgs>
-        auto send(RC::StringViewType content, OptionalArg optional_arg, FmtArgs... fmt_args) -> void
+        auto send(RC::StringViewType content, OptionalArg level, FmtArgs... args) -> void
         {
-            if (m_opened_devices.empty())
-            {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
-            }
-
-            for (const auto& device : m_opened_devices)
-            {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(detail::format_message(content, fmt_args...), static_cast<int32_t>(optional_arg));
-                }
-                else
-                {
-                    device->receive(detail::format_message(content, fmt_args...));
-                }
-            }
+            if constexpr (sizeof...(args) == 0) { detail::send_to_group(m_group, content, static_cast<int32_t>(level)); }
+            else { detail::send_to_group(m_group, detail::format_message(content, args...), static_cast<int32_t>(level)); }
         }
-
-        auto send(const RC::StringType& content) -> void
+        auto send(const RC::StringType& content) -> void { detail::send_to_group(m_group, content, 0); }
+        template <int32_t level, typename... FmtArgs>
+        auto send(RC::StringViewType content, FmtArgs... args) -> void
         {
-            if (m_opened_devices.empty())
-            {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
-            }
-
-            for (const auto& device : m_opened_devices)
-            {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(content, 0);
-                }
-                else
-                {
-                    device->receive(content);
-                }
-            }
+            if constexpr (sizeof...(args) == 0) { detail::send_to_group(m_group, content, level); }
+            else { detail::send_to_group(m_group, detail::format_message(content, args...), level); }
         }
-
-        template <int32_t optional_arg, typename FmtArg, typename... FmtArgs>
-        auto send(RC::StringViewType content, FmtArg fmt_arg, FmtArgs... fmt_args) -> void
-        {
-            if (m_opened_devices.empty())
-            {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
-            }
-
-            for (const auto& device : m_opened_devices)
-            {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(detail::format_message(content, fmt_arg, fmt_args...), optional_arg);
-                }
-                else
-                {
-                    device->receive(detail::format_message(content, fmt_arg, fmt_args...));
-                }
-            }
-        }
-
-        template <int32_t optional_arg>
-        auto send(const RC::StringType& content) -> void
-        {
-            if (m_opened_devices.empty())
-            {
-                THROW_INTERNAL_OUTPUT_ERROR("[Output::send] Attempted to send but there were no opened devices.");
-            }
-
-            for (const auto& device : m_opened_devices)
-            {
-                ASSERT_OUTPUT_DEVICE_IS_VALID(device)
-
-                if (device->has_optional_arg())
-                {
-                    device->receive_with_optional_arg(content, optional_arg);
-                }
-                else
-                {
-                    device->receive(content);
-                }
-            }
-        }
-
         template <typename DeviceType>
-        auto get_device() -> DeviceType&
-        {
-            return get_device_internal<DeviceType>(m_opened_devices);
-        }
+        auto get_device() -> DeviceType& { return detail::get_device<DeviceType>(m_group); }
     };
 
-    // Call this once at the start of your program in order to set the default devices
-    // Without this you cannot use the static send function (use the non-static send_to function instead)
     template <typename DeviceType>
     auto set_default_devices() -> DeviceType&
     {
-        return *static_cast<DeviceType*>(DefaultTargets::get_default_devices_ref().emplace_back(std::make_unique<DeviceType>()).get());
+        return static_cast<DeviceType&>(detail::add_device(DefaultTargets::get_group(), std::make_unique<DeviceType>()));
     }
-
-    // Version of set_default_devices() that can take multiple devices
     template <typename DeviceType, typename DeviceTypeWorkaround, typename... DeviceTypes>
     auto set_default_devices() -> void
     {
-        DefaultTargets::get_default_devices_ref().emplace_back(std::make_unique<DeviceType>());
+        set_default_devices<DeviceType>();
         set_default_devices<DeviceTypeWorkaround, DeviceTypes...>();
     }
-
-    auto inline clear_all_default_devices() -> void
-    {
-        DefaultTargets::get_default_devices_ref().clear();
-    }
-
-    // Sets the log level that will be used if one isn't explicitly provided with the 'send' function
-    template <int32_t log_level>
-    auto set_default_log_level() -> void
-    {
-        DefaultTargets::set_default_log_level(log_level);
-    }
-
-    template <typename... FmtArgs>
-    auto send(RC::StringViewType content, FmtArgs... fmt_args) -> void
-    {
-        for (const auto& device : DefaultTargets::get_default_devices_ref())
-        {
-            ASSERT_DEFAULT_OUTPUT_DEVICE_IS_VALID(device)
-
-            if (device->has_optional_arg())
-            {
-                device->receive_with_optional_arg(detail::format_message(content, fmt_args...), 0);
-            }
-            else
-            {
-                device->receive(detail::format_message(content, fmt_args...));
-            }
-        }
-    }
-
-    template <EnumType OptionalArg, typename... FmtArgs>
-    auto send(RC::StringViewType content, OptionalArg optional_arg, FmtArgs... fmt_args) -> void
-    {
-        for (const auto& device : DefaultTargets::get_default_devices_ref())
-        {
-            ASSERT_DEFAULT_OUTPUT_DEVICE_IS_VALID(device)
-
-            if (device->has_optional_arg())
-            {
-                device->receive_with_optional_arg(detail::format_message(content, fmt_args...), static_cast<int32_t>(optional_arg));
-            }
-            else
-            {
-                device->receive(detail::format_message(content, fmt_args...));
-            }
-        }
-    }
+    auto inline clear_all_default_devices() -> void { DefaultTargets::close_all_default_devices(); }
+    template <int32_t level>
+    auto set_default_log_level() -> void { DefaultTargets::set_default_log_level(level); }
 
     auto RC_DYNOUT_API send(RC::StringViewType content) -> void;
-
-    template <EnumType OptionalArg>
-    auto send(RC::StringViewType content, OptionalArg optional_arg) -> void
+    template <typename... FmtArgs>
+    auto send(RC::StringViewType content, FmtArgs... args) -> void
     {
-        for (const auto& device : DefaultTargets::get_default_devices_ref())
-        {
-            ASSERT_DEFAULT_OUTPUT_DEVICE_IS_VALID(device)
-
-            if (device->has_optional_arg())
-            {
-                device->receive_with_optional_arg(content, optional_arg);
-            }
-            else
-            {
-                device->receive(content);
-            }
-        }
+        detail::send_to_group(DefaultTargets::get_group(), detail::format_message(content, args...), 0);
     }
-
-    template <int32_t optional_arg, typename... FmtArgs>
-    auto send(RC::StringViewType content, FmtArgs... fmt_args) -> void
+    template <EnumType OptionalArg, typename... FmtArgs>
+    auto send(RC::StringViewType content, OptionalArg level, FmtArgs... args) -> void
     {
-        for (const auto& device : DefaultTargets::get_default_devices_ref())
-        {
-            ASSERT_DEFAULT_OUTPUT_DEVICE_IS_VALID(device)
-
-            if (device->has_optional_arg())
-            {
-                device->receive_with_optional_arg(detail::format_message(content, fmt_args...), optional_arg);
-            }
-            else
-            {
-                device->receive(detail::format_message(content, fmt_args...));
-            }
-        }
+        if constexpr (sizeof...(args) == 0) { detail::send_to_group(DefaultTargets::get_group(), content, static_cast<int32_t>(level)); }
+        else { detail::send_to_group(DefaultTargets::get_group(), detail::format_message(content, args...), static_cast<int32_t>(level)); }
     }
-
-    template <int32_t optional_arg>
-    auto send(RC::StringViewType content) -> void
+    template <int32_t level, typename... FmtArgs>
+    auto send(RC::StringViewType content, FmtArgs... args) -> void
     {
-        for (const auto& device : DefaultTargets::get_default_devices_ref())
-        {
-            ASSERT_DEFAULT_OUTPUT_DEVICE_IS_VALID(device)
-
-            if (device->has_optional_arg())
-            {
-                device->receive_with_optional_arg(content, optional_arg);
-            }
-            else
-            {
-                device->receive(content);
-            }
-        }
+        if constexpr (sizeof...(args) == 0) { detail::send_to_group(DefaultTargets::get_group(), content, level); }
+        else { detail::send_to_group(DefaultTargets::get_group(), detail::format_message(content, args...), level); }
     }
-
     template <typename DeviceType>
-    auto get_device() -> DeviceType&
-    {
-        return get_device_internal<DeviceType>(DefaultTargets::get_default_devices_ref());
-    }
-
+    auto get_device() -> DeviceType& { return detail::get_device<DeviceType>(DefaultTargets::get_group()); }
     auto RC_DYNOUT_API close_all_default_devices() -> void;
 
-    // Locks an output device so that nothing else can interact with it until the lock goes out of scope.
-    // Used when you want to output multiple things with multiple calls to 'send' without interruptions.
-    class Lock
+    class RC_DYNOUT_API Lock
     {
-      private:
         const OutputDevice* m_output_device{};
-
       public:
-        // Locks/Unlocks all default devices.
-        Lock()
-        {
-            for (const auto& device : DefaultTargets::get_default_devices_ref())
-            {
-                device->lock();
-            }
-        }
-
-        Lock(OutputDevice* output_device) : m_output_device(output_device)
-        {
-            m_output_device->lock();
-        }
-
-        Lock(const OutputDevice* output_device) : m_output_device(output_device)
-        {
-            m_output_device->lock();
-        }
-
-        ~Lock()
-        {
-            if (m_output_device)
-            {
-                m_output_device->unlock();
-            }
-            else
-            {
-                for (const auto& device : DefaultTargets::get_default_devices_ref())
-                {
-                    device->unlock();
-                }
-            }
-        }
+        Lock();
+        explicit Lock(const OutputDevice* device);
+        Lock(const Lock&) = delete;
+        auto operator=(const Lock&) -> Lock& = delete;
+        ~Lock();
     };
-} // namespace RC::Output
+}
 
 #endif // UE4SS_REWRITTEN_OUTPUT_HPP

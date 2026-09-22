@@ -298,9 +298,17 @@ namespace RC::JSScript
 
     auto JSMod::stop() -> void
     {
+        UE4SSProgram::get_program().unregister_input_owner(reinterpret_cast<uintptr_t>(this));
+        // Input dispatch is drained first; the VM lock then waits for dequeued keybinds.
+        std::lock_guard<std::recursive_mutex> js_lock(m_js_mutex);
         if (!m_initialized && !m_runtime)
         {
             return;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_pending_keybind_mutex);
+            m_pending_keybind_callbacks.clear();
         }
 
         Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Stopping JavaScript engine...\n"));
@@ -843,13 +851,13 @@ namespace RC::JSScript
 
     auto JSMod::tick() -> void
     {
+        std::lock_guard<std::recursive_mutex> js_lock(m_js_mutex);
         if (!m_initialized || !m_main_ctx)
             return;
 
         if (m_in_tick)
             return;
 
-        std::lock_guard<std::recursive_mutex> js_lock(m_js_mutex);
         m_in_tick = true;
         JS_UpdateStackTop(m_runtime);
         begin_exec_budget();
