@@ -253,28 +253,7 @@ fn workspace_root() -> Result<Utf8PathBuf> {
 
 fn sync_abi() -> Result<()> {
     let root = workspace_root()?;
-    write_if_changed(
-        &root.join(
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/GeneratedRustCoreAbi.hpp",
-        ),
-        &ue4ssl_abi::render_rustcore_header(),
-    )?;
-    write_if_changed(
-        &root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Unreal/Compat/GeneratedPsScanAbi.hpp"),
-        &ue4ssl_abi::render_scan_header(),
-    )?;
-    write_if_changed(
-        &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/GeneratedHostAbi.hpp"),
-        &ue4ssl_abi::render_host_header(),
-    )?;
-    write_if_changed(
-        &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/RustRuntimeFFI.hpp"),
-        &ue4ssl_abi::render_runtime_header(),
-    )?;
-    write_if_changed(
-        &root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include/Compat/RustSupportFFI.hpp"),
-        &ue4ssl_abi::render_support_header(),
-    )?;
+    ue4ssl_build::common::sync_abi_headers(root.as_std_path())?;
     Ok(())
 }
 
@@ -371,7 +350,14 @@ fn build_native_support(profile: CargoProfile, target: Option<&str>) -> Result<(
     let root = workspace_root()?;
     let shell = Shell::new()?;
     prepare_cargo_shell(&shell, &root);
-    let package_args = ["-p", "ue4ssl-unreal-support", "-p", "ue4ssl-support"];
+    let package_args = [
+        "-p",
+        "ue4ssl-unreal-support",
+        "-p",
+        "ue4ssl-platform",
+        "-p",
+        "patternsleuth_bind",
+    ];
 
     let package_args = package_args
         .iter()
@@ -782,18 +768,4 @@ fn copy_tree(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
 
 fn default_proxy_path() -> Utf8PathBuf {
     Utf8PathBuf::from(r"C:\Windows\System32\dwmapi.dll")
-}
-
-fn write_if_changed(path: &Utf8Path, content: &str) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent.as_std_path())?;
-    }
-
-    match fs::read_to_string(path.as_std_path()) {
-        Ok(existing) if existing == content => Ok(()),
-        _ => {
-            fs::write(path.as_std_path(), content)?;
-            Ok(())
-        }
-    }
 }

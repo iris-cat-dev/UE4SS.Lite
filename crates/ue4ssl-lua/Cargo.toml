@@ -13,4 +13,4 @@ ue4ssl-lua-support = { path = "../ue4ssl-lua-support" }
 
 [build-dependencies]
 cc.workspace = true
-ue4ssl_abi.workspace = true
+ue4ssl-build.workspace = true

@@ -11,4 +11,4 @@ crate-type = ["cdylib"]
 
 [build-dependencies]
 cc.workspace = true
-ue4ssl_abi.workspace = true
+ue4ssl-build.workspace = true

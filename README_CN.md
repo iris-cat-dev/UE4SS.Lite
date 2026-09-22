@@ -17,16 +17,30 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 
 ## 仓库结构
 
-- `crates/ue4ssl-dll`：核心 `UE4SSL.dll` 的 Rust 入口。
-- `crates/ue4ssl-runtime`、`crates/ue4ssl-abi`：Rust 运行时逻辑、宿主 API 和生成的 C/C++ ABI 头。
-- `crates/ue4ssl-support`：Input、DynamicOutput、Helpers、String、SinglePassSigScanner 等共享 native 支撑库，以及 vendored UE4SSL 和 MProgram C++ 边界源码；构建 `ue4ssl_native_support_cpp.lib` 和 `ue4ssl_core_cpp.lib`。
-- `crates/ue4ssl-unreal-support`：vendored Unreal、Constructs、Function 源码；构建 `ue4ssl_unreal_cpp.lib`。
-- `crates/ue4ssl-hook`：UE4SSHook 的 Rust 实现和 C++ 兼容头。
-- `crates/ue4ssl-javascript*` 与 `crates/ue4ssl-lua*`：脚本引擎运行时和 VM support crate。
-- `Mods/*/native`：纳入 Cargo workspace 的原生 Mod。
-- `crates/xtask`：build、package、install、proxy 和 ABI 同步命令。
+`crates/` 下恰好有 16 个 Cargo 包。原生源码放在实际负责构建它的模块内：
 
-旧的根目录 `UE4SSL/` 和 `deps/first/` 源码目录已经不再使用。相关内容现在都位于 `crates/` 下的 support 或 native crate 中。`crates/ue4ssl-unreal-support/vendor/Unreal` 是普通 vendor 源码树，不是 Git 子模块。
+| 模块 | 职责 |
+|---|---|
+| `ue4ssl-abi` | 跨语言契约、C/C++ ABI 头生成。 |
+| `ue4ssl-runtime` | Mod 发现、状态、事件队列和生命周期执行。 |
+| `ue4ssl-platform` | Rust 输入、日志和文件服务；编译对应的 `native/Input`、`native/DynamicOutput` 薄适配，基础公共头位于 `native/Common`。 |
+| `ue4ssl-dll` | 核心 `UE4SSL.dll` 组装、启动和关闭；拥有并编译 `native/UE4SSL` 下的核心 C++ 边界代码。 |
+| `ue4ssl-unreal-support` | `vendor/Unreal` 下的引擎对象、布局、版本及原生调用适配；这是普通 vendor 源码树，不是 Git 子模块。 |
+| `ue4ssl-hook` | Detour、IAT、指令地址辅助及对应 C++ 兼容头。 |
+| `patternsleuth-scanner` | 字节模式与交叉引用扫描算法。 |
+| `patternsleuth` | 映像、进程分析及地址解析器。 |
+| `patternsleuth-bind` | 扫描 C ABI 与 `native/SinglePassSigScanner` 适配；不负责组装 runtime 或 Hook 库。 |
+| `ue4ssl-lua` | Lua Mod 生命周期、Unreal/脚本绑定，生成 Lua 插件 DLL。 |
+| `ue4ssl-lua-support` | LuaRaw VM 和 LuaMadeSimple 原生依赖。 |
+| `ue4ssl-javascript` | JavaScript Mod 生命周期、Unreal/脚本绑定，生成 JS 插件 DLL。 |
+| `ue4ssl-javascript-support` | QuickJS 原生依赖。 |
+| `ue4ssl-proxy` | 原 DLL 导出转发与核心加载。 |
+| `ue4ssl-build` | 公共构建辅助、ABI 头同步及原生 Mod 编译。 |
+| `xtask` | 构建顺序、生成 Mod workspace、打包、安装及 Proxy 命令。 |
+
+`Mods/*/native` 是通过生成的 Cargo workspace 构建的原生 Mod。各构建脚本通过依赖 `ue4ssl-build` 复用工具，不再通过相对路径包含公共 Rust 源码。平台服务不编译核心或扫描适配；核心 DLL 负责组装并 whole-archive 链接各自归属的原生库。
+
+`docs/baseline-*` 和 `docs/migration-validation.json` 是历史快照，其中旧源码路径与哈希有意保留，不改写成当前目录，以免伪造基线来源。
 
 ## 构建
 

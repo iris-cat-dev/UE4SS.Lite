@@ -11,4 +11,4 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 xshell.workspace = true
-ue4ssl_abi.workspace = true
+ue4ssl-build.workspace = true

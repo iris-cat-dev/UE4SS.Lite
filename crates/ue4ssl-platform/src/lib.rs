@@ -4,12 +4,6 @@ pub extern "C" fn ue4ssl_native_support_anchor() {}
 #[used]
 static FORCE_LINK_NATIVE_SUPPORT: extern "C" fn() = ue4ssl_native_support_anchor;
 
-#[no_mangle]
-pub extern "C" fn ue4ssl_cpp_support_anchor() {}
-
-#[used]
-static FORCE_LINK_UE4SSL_CPP_SUPPORT: extern "C" fn() = ue4ssl_cpp_support_anchor;
-
 pub use ue4ssl_abi::OwnedString as NativeOwnedString;
 
 fn ffi_boundary<T: Default>(body: impl FnOnce() -> T) -> T {
@@ -1531,7 +1525,7 @@ mod logging_tests {
     fn file_devices_truncate_once_append_utf8_and_reject_closed_handles() {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let directory = std::env::temp_dir().join(format!(
-            "ue4ssl-support-log-{}-{}",
+            "ue4ssl-platform-log-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));

@@ -17,16 +17,30 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 
 ## Repository Layout
 
-- `crates/ue4ssl-dll`: Rust entry point for the core `UE4SSL.dll`.
-- `crates/ue4ssl-runtime`, `crates/ue4ssl-abi`: Rust runtime logic, host API, and generated C/C++ ABI headers.
-- `crates/ue4ssl-support`: shared native support libraries plus the vendored UE4SSL and MProgram C++ boundary sources; builds `ue4ssl_native_support_cpp.lib` and `ue4ssl_core_cpp.lib`.
-- `crates/ue4ssl-unreal-support`: vendored Unreal, Constructs, and Function sources; builds `ue4ssl_unreal_cpp.lib`.
-- `crates/ue4ssl-hook`: Rust implementation of UE4SSHook plus C++ compatibility headers.
-- `crates/ue4ssl-javascript*` and `crates/ue4ssl-lua*`: script engine runtimes and VM support crates.
-- `Mods/*/native`: native mods that are part of the Cargo workspace.
-- `crates/xtask`: build, package, install, proxy, and ABI synchronization commands.
+`crates/` contains exactly 16 Cargo packages. Native source lives under the package that builds it:
 
-The old root-level `UE4SSL/` and `deps/first/` source directories are no longer used. Their contents now live under `crates/` as support or native crates. `crates/ue4ssl-unreal-support/vendor/Unreal` is a normal vendored source tree, not a Git submodule.
+| Package | Responsibility |
+|---|---|
+| `ue4ssl-abi` | Cross-language contracts and C/C++ ABI header generation. |
+| `ue4ssl-runtime` | Mod discovery, state, event queues and lifecycle execution. |
+| `ue4ssl-platform` | Rust input, logging and file services; builds the matching `native/Input` and `native/DynamicOutput` adapters. Shared foundational headers live in `native/Common`. |
+| `ue4ssl-dll` | Core `UE4SSL.dll` assembly, startup and shutdown; owns and builds the core C++ boundary under `native/UE4SSL`. |
+| `ue4ssl-unreal-support` | Unreal object/layout/version/native-call adaptation under `vendor/Unreal`; this is a normal vendored tree, not a Git submodule. |
+| `ue4ssl-hook` | Detour/IAT and instruction-address helpers, plus their C++ compatibility headers. |
+| `patternsleuth-scanner` | Byte-pattern and cross-reference scanning algorithms. |
+| `patternsleuth` | Image/process analysis and address resolvers. |
+| `patternsleuth-bind` | Scanning C ABI and its `native/SinglePassSigScanner` adapter; does not assemble the runtime or Hook library. |
+| `ue4ssl-lua` | Lua Mod lifecycle and Unreal/script bindings; produces the Lua plugin DLL. |
+| `ue4ssl-lua-support` | LuaRaw VM and LuaMadeSimple native dependencies. |
+| `ue4ssl-javascript` | JavaScript Mod lifecycle and Unreal/script bindings; produces the JS plugin DLL. |
+| `ue4ssl-javascript-support` | QuickJS native dependency. |
+| `ue4ssl-proxy` | Original-DLL export forwarding and core loading. |
+| `ue4ssl-build` | Shared build helpers, ABI-header synchronization and native Mod compilation. |
+| `xtask` | Build ordering, generated Mod workspaces, packaging, installation and proxy commands. |
+
+`Mods/*/native` contains native Mods built through generated Cargo workspaces. Build scripts depend on `ue4ssl-build`; they do not include a shared Rust source file by relative path. The platform service does not compile the core or scanning adapter. DLL assembly owns whole-archive linking of those separately built components.
+
+`docs/baseline-*` and `docs/migration-validation.json` are historical snapshots. Their old source paths and hashes are intentionally retained, not rewritten to imply that the baseline used the current directory layout.
 
 ## Building
 

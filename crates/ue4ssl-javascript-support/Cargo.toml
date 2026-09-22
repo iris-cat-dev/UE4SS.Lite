@@ -11,3 +11,4 @@ crate-type = ["rlib", "staticlib"]
 
 [build-dependencies]
 cc.workspace = true
+ue4ssl-build.workspace = true

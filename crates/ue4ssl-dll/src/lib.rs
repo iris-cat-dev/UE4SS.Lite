@@ -1,9 +1,15 @@
 #![allow(non_snake_case)]
 
+#[no_mangle]
+pub extern "C" fn ue4ssl_cpp_support_anchor() {}
+
+#[used]
+static FORCE_LINK_UE4SSL_CPP_SUPPORT: extern "C" fn() = ue4ssl_cpp_support_anchor;
+
 pub fn ensure_linked() {
-    ue4ssl_support::ue4ssl_native_support_anchor();
+    ue4ssl_platform::ue4ssl_native_support_anchor();
     ue4ssl_unreal_support::ue4ssl_unreal_support_anchor();
-    ue4ssl_support::ue4ssl_cpp_support_anchor();
+    ue4ssl_cpp_support_anchor();
     ue4ssl_runtime::force_link_exports();
     ue4ssl_hook::force_link_exports();
     patternsleuth_bind::force_link_exports();

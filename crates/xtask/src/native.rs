@@ -103,33 +103,35 @@ struct NativeModManifest {
 
 pub const NATIVE_GROUPS: &[NativeGroup] = &[
     NativeGroup {
-        name: "ue4ssl_support",
+        name: "ue4ssl_platform",
         strategy: NativeStrategy::BuildRsCc,
-        legacy_targets: &[
-            "ue4ssl_native_support",
-            "Input",
-            "Helpers",
-            "DynamicOutput",
-            "SinglePassSigScanner",
-            "UE4SSHook",
-            "UE4SSL",
-            "MProgram",
-        ],
+        legacy_targets: &["ue4ssl_native_support", "Input", "Helpers", "DynamicOutput"],
         source_roots: &[
-            "crates/ue4ssl-native-support/vendor/Input/src",
-            "crates/ue4ssl-native-support/vendor/DynamicOutput/src",
-            "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/src",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/src",
+            "crates/ue4ssl-platform/native/Input/src",
+            "crates/ue4ssl-platform/native/DynamicOutput/src",
         ],
         include_roots: &[
-            "crates/ue4ssl-native-support/vendor/Input/include",
-            "crates/ue4ssl-native-support/vendor/Common/include",
-            "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
-            "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
-            "crates/ue4ssl-hook/include",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/include",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include",
+            "crates/ue4ssl-platform/native/Input/include",
+            "crates/ue4ssl-platform/native/Common/include",
+            "crates/ue4ssl-platform/native/DynamicOutput/include",
         ],
+    },
+    NativeGroup {
+        name: "ue4ssl_core",
+        strategy: NativeStrategy::BuildRsCc,
+        legacy_targets: &["UE4SSL", "MProgram"],
+        source_roots: &["crates/ue4ssl-dll/native/UE4SSL/src"],
+        include_roots: &[
+            "crates/ue4ssl-dll/native/UE4SSL/include",
+            "crates/ue4ssl-dll/native/UE4SSL/generated_include",
+        ],
+    },
+    NativeGroup {
+        name: "patternsleuth_bind",
+        strategy: NativeStrategy::BuildRsCc,
+        legacy_targets: &["SinglePassSigScanner"],
+        source_roots: &["crates/patternsleuth-bind/native/SinglePassSigScanner/src"],
+        include_roots: &["crates/patternsleuth-bind/native/SinglePassSigScanner/include"],
     },
     NativeGroup {
         name: "ue4ssl_unreal_support",
@@ -137,7 +139,7 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
         legacy_targets: &["Constructs", "Function", "Unreal"],
         source_roots: &["crates/ue4ssl-unreal-support/vendor/Unreal/src"],
         include_roots: &[
-            "crates/ue4ssl-native-support/vendor/Common/include",
+            "crates/ue4ssl-platform/native/Common/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include/Function",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/generated_include",
@@ -339,7 +341,10 @@ pub fn discover_native_mods(workspace_root: &Utf8Path) -> Result<Vec<NativeModSp
         }
 
         let mut include_dirs = Vec::new();
-        for default_include in [mod_root.join("native").join("include"), mod_root.join("include")] {
+        for default_include in [
+            mod_root.join("native").join("include"),
+            mod_root.join("include"),
+        ] {
             if default_include.is_dir() {
                 include_dirs.push(default_include);
             }
@@ -449,9 +454,9 @@ pub fn write_generated_mod_workspace(
         fs::create_dir_all(src_dir.as_std_path())
             .with_context(|| format!("failed to create {src_dir}"))?;
 
-        let build_crate = workspace_root.join("crates").join("ue4ssl-mod-build");
+        let build_crate = workspace_root.join("crates").join("ue4ssl-build");
         let cargo_toml = format!(
-            "[package]\nname = {}\nedition = \"2021\"\nversion = \"0.1.0\"\npublish = false\n\n[lib]\nname = {}\npath = \"src/lib.rs\"\ncrate-type = [\"cdylib\"]\n\n[build-dependencies]\nue4ssl-mod-build = {{ path = {} }}\n",
+            "[package]\nname = {}\nedition = \"2021\"\nversion = \"0.1.0\"\npublish = false\n\n[lib]\nname = {}\npath = \"src/lib.rs\"\ncrate-type = [\"cdylib\"]\n\n[build-dependencies]\nue4ssl-build = {{ path = {} }}\n",
             toml_string(&spec.package_name),
             toml_string(&spec.cargo_target_stem),
             toml_string(build_crate.as_str())
@@ -459,7 +464,7 @@ pub fn write_generated_mod_workspace(
         write_if_changed(&package_dir.join("Cargo.toml"), &cargo_toml)?;
         write_if_changed(
             &package_dir.join("build.rs"),
-            "fn main() {\n    let manifest_dir = std::path::PathBuf::from(std::env::var_os(\"CARGO_MANIFEST_DIR\").expect(\"missing CARGO_MANIFEST_DIR\"));\n    ue4ssl_mod_build::build_from_file(manifest_dir.join(\"ue4ssl-mod-build.json\"));\n}\n",
+            "fn main() {\n    let manifest_dir = std::path::PathBuf::from(std::env::var_os(\"CARGO_MANIFEST_DIR\").expect(\"missing CARGO_MANIFEST_DIR\"));\n    ue4ssl_build::build_from_file(manifest_dir.join(\"ue4ssl-build.json\"));\n}\n",
         )?;
         write_if_changed(
             &src_dir.join("lib.rs"),
@@ -477,8 +482,9 @@ pub fn write_generated_mod_workspace(
             cpp_standard: spec.cpp_standard.clone(),
             archive_stem: format!("{}_cpp", spec.cargo_target_stem),
         };
-        let input = serde_json::to_string_pretty(&input).context("failed to encode mod build input")?;
-        write_if_changed(&package_dir.join("ue4ssl-mod-build.json"), &(input + "\n"))?;
+        let input =
+            serde_json::to_string_pretty(&input).context("failed to encode mod build input")?;
+        write_if_changed(&package_dir.join("ue4ssl-build.json"), &(input + "\n"))?;
         members.push(format!("packages/{}", spec.package_name));
     }
 
@@ -643,7 +649,12 @@ fn validate_unique_mods(specs: &[NativeModSpec]) -> Result<()> {
     let mut target_stems = HashMap::new();
 
     for spec in specs {
-        insert_unique(&mut mod_names, spec.mod_name.to_lowercase(), &spec.mod_name, "mod name")?;
+        insert_unique(
+            &mut mod_names,
+            spec.mod_name.to_lowercase(),
+            &spec.mod_name,
+            "mod name",
+        )?;
         insert_unique(
             &mut package_names,
             spec.package_name.clone(),

@@ -1,13 +1,10 @@
-#[path = "../build_support/common.rs"]
-mod common;
-
 use std::env;
 
 use std::path::PathBuf;
 
 use cc::Build;
 
-use common::{
+use ue4ssl_build::common::{
     apply_common_defines, apply_common_msvc_flags, cc_archive_path, collect_sources, define,
     emit_dylib_link, emit_rerun_for_tree, generate_abi_headers, require_paths_exist,
     require_relative_paths_exist, target_dir, version_defines, whole_archive_flag,
@@ -39,17 +36,17 @@ fn main() {
             "crates/ue4ssl-javascript/native/cpp",
             "crates/ue4ssl-javascript/native/include",
             "crates/ue4ssl-javascript-support/vendor/quickjs",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/include",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include",
-            "crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_src/version.cache",
+            "crates/ue4ssl-dll/native/UE4SSL/include",
+            "crates/ue4ssl-dll/native/UE4SSL/generated_include",
+            "crates/ue4ssl-dll/native/UE4SSL/generated_src/version.cache",
             "crates/ue4ssl-unreal-support/vendor/Unreal/src",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/generated_include",
             "crates/ue4ssl-object-searcher/include",
-            "crates/ue4ssl-native-support/vendor/Input/include",
-            "crates/ue4ssl-native-support/vendor/Common/include",
-            "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
-            "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
+            "crates/ue4ssl-platform/native/Input/include",
+            "crates/ue4ssl-platform/native/Common/include",
+            "crates/ue4ssl-platform/native/DynamicOutput/include",
+            "crates/patternsleuth-bind/native/SinglePassSigScanner/include",
             "crates/ue4ssl-unreal-support/vendor/Unreal/include/Function",
             "crates/ue4ssl-hook/include",
         ],
@@ -64,16 +61,16 @@ fn main() {
         workspace_root.join("crates/ue4ssl-javascript/native/cpp"),
         workspace_root.join("crates/ue4ssl-javascript/native/include"),
         workspace_root.join("crates/ue4ssl-javascript-support/vendor/quickjs"),
-        workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include"),
-        workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"),
-        workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_src"),
+        workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/include"),
+        workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/generated_include"),
+        workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/generated_src"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
         workspace_root.join("crates/ue4ssl-object-searcher/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Input/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/Input/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/include"),
+        workspace_root.join("crates/patternsleuth-bind/native/SinglePassSigScanner/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Function"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
@@ -128,8 +125,8 @@ fn compile_javascript_archive(
     for include in common_include_dirs(workspace_root).into_iter().chain([
         workspace_root.join("crates/ue4ssl-javascript/native/include"),
         workspace_root.join("crates/ue4ssl-javascript-support/vendor/quickjs"),
-        workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include"),
-        workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"),
+        workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/include"),
+        workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/generated_include"),
         generated_ue4ssl_include.to_path_buf(),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"),
         workspace_root.join("crates/ue4ssl-object-searcher/include"),
@@ -177,10 +174,10 @@ fn javascript_sources(workspace_root: &std::path::Path) -> Vec<PathBuf> {
 
 fn common_include_dirs(workspace_root: &std::path::Path) -> Vec<PathBuf> {
     let mut dirs = vec![
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Input/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/DynamicOutput/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/Input/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/include"),
+        workspace_root.join("crates/patternsleuth-bind/native/SinglePassSigScanner/include"),
         workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include/Function"),
         workspace_root.join("crates/ue4ssl-object-searcher/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),

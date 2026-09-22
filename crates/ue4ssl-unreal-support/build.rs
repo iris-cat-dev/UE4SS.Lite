@@ -1,11 +1,8 @@
-#[path = "../build_support/common.rs"]
-mod common;
-
 use std::env;
 use std::path::PathBuf;
 
 use cc::Build;
-use common::{
+use ue4ssl_build::common::{
     add_defines, apply_common_defines, apply_common_msvc_flags, cc_archive_path, collect_sources,
     emit_rerun_for_tree, emit_static_archive_metadata, generate_abi_headers,
     native_support_include_dirs, require_nonempty_sources, require_paths_exist,
@@ -39,7 +36,7 @@ fn main() {
             unreal_root.join("include"),
             unreal_root.join("generated_include"),
             workspace_root.join("crates/ue4ssl-object-searcher/include"),
-            workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
+            workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
             workspace_root.join("crates/ue4ssl-hook/include"),
         ],
     );
@@ -49,7 +46,7 @@ fn main() {
         unreal_root.join("include"),
         unreal_root.join("generated_include"),
         workspace_root.join("crates/ue4ssl-object-searcher/include"),
-        workspace_root.join("crates/ue4ssl-native-support/vendor/Common/include"),
+        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
         workspace_root.join("crates/ue4ssl-hook/include"),
     ] {
         emit_rerun_for_tree(&tracked);

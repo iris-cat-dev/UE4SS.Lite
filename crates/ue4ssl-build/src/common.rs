@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
@@ -44,11 +42,10 @@ pub struct GeneratedAbiIncludeRoots {
     pub unreal_include: PathBuf,
 }
 
-pub const UE4SSL_CPP_SUPPORT_ROOT: &str = "crates/ue4ssl-cpp-support/vendor/UE4SSL";
+pub const UE4SSL_CPP_SUPPORT_ROOT: &str = "crates/ue4ssl-dll/native/UE4SSL";
 pub const UE4SSL_UNREAL_SUPPORT_ROOT: &str = "crates/ue4ssl-unreal-support/vendor";
 pub const UE4SSL_OBJECT_SEARCHER_INCLUDE_ROOT: &str = "crates/ue4ssl-object-searcher/include";
-pub const UE4SSL_NATIVE_COMMON_INCLUDE_ROOT: &str =
-    "crates/ue4ssl-native-support/vendor/Common/include";
+pub const UE4SSL_NATIVE_COMMON_INCLUDE_ROOT: &str = "crates/ue4ssl-platform/native/Common/include";
 pub const UE4SS_HOOK_ROOT: &str = "crates/ue4ssl-hook";
 
 pub fn workspace_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
@@ -103,10 +100,10 @@ pub fn ue4ss_hook_root(workspace_root: &Path) -> PathBuf {
 
 pub fn native_support_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
     [
-        "crates/ue4ssl-native-support/vendor/Input/include",
+        "crates/ue4ssl-platform/native/Input/include",
         UE4SSL_NATIVE_COMMON_INCLUDE_ROOT,
-        "crates/ue4ssl-native-support/vendor/DynamicOutput/include",
-        "crates/ue4ssl-native-support/vendor/SinglePassSigScanner/include",
+        "crates/ue4ssl-platform/native/DynamicOutput/include",
+        "crates/patternsleuth-bind/native/SinglePassSigScanner/include",
     ]
     .into_iter()
     .map(|relative| workspace_root.join(relative))
@@ -212,6 +209,30 @@ pub fn collect_sources(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
     collect_sources_inner(dir, extensions, &mut out);
     out.sort();
     out
+}
+
+pub fn collect_sources_in_dir(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
+    if !dir.is_dir() {
+        return Vec::new();
+    }
+
+    let mut sources: Vec<PathBuf> = fs::read_dir(dir)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", dir.display()))
+        .map(|entry| {
+            entry
+                .unwrap_or_else(|err| panic!("failed to read entry in {}: {err}", dir.display()))
+                .path()
+        })
+        .filter(|path| {
+            path.is_file()
+                && matches!(
+                    path.extension().and_then(OsStr::to_str),
+                    Some(extension) if extensions.contains(&extension)
+                )
+        })
+        .collect();
+    sources.sort();
+    sources
 }
 
 pub fn require_paths_exist<I, P>(component: &str, paths: I)
@@ -420,8 +441,8 @@ pub fn generate_abi_headers(out_dir: &Path) -> io::Result<GeneratedAbiIncludeRoo
     let generated_root = out_dir.join("generated_abi");
     let ue4ssl_include = generated_root
         .join("crates")
-        .join("ue4ssl-cpp-support")
-        .join("vendor")
+        .join("ue4ssl-dll")
+        .join("native")
         .join("UE4SSL")
         .join("include");
     let unreal_include = generated_root
@@ -431,6 +452,22 @@ pub fn generate_abi_headers(out_dir: &Path) -> io::Result<GeneratedAbiIncludeRoo
         .join("Unreal")
         .join("include");
 
+    write_abi_headers(&ue4ssl_include, &unreal_include)?;
+
+    Ok(GeneratedAbiIncludeRoots {
+        ue4ssl_include,
+        unreal_include,
+    })
+}
+
+pub fn sync_abi_headers(workspace_root: &Path) -> io::Result<()> {
+    write_abi_headers(
+        &ue4ssl_cpp_root(workspace_root).join("include"),
+        &unreal_root(workspace_root).join("include"),
+    )
+}
+
+fn write_abi_headers(ue4ssl_include: &Path, unreal_include: &Path) -> io::Result<()> {
     write_if_changed(
         &ue4ssl_include
             .join("Compat")
@@ -457,10 +494,7 @@ pub fn generate_abi_headers(out_dir: &Path) -> io::Result<GeneratedAbiIncludeRoo
         &ue4ssl_abi::render_scan_header(),
     )?;
 
-    Ok(GeneratedAbiIncludeRoots {
-        ue4ssl_include,
-        unreal_include,
-    })
+    Ok(())
 }
 
 pub fn cc_archive_path(out_dir: &Path, archive_stem: &str) -> PathBuf {

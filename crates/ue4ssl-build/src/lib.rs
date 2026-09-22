@@ -1,5 +1,4 @@
-#[path = "../../build_support/common.rs"]
-mod common;
+pub mod common;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -90,11 +89,9 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     for include_dir in &include_dirs {
         emit_rerun_for_tree(include_dir);
     }
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/include"));
+    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/include"));
     emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"));
-    emit_rerun_for_tree(
-        &workspace_root.join("crates/ue4ssl-cpp-support/vendor/UE4SSL/generated_include"),
-    );
+    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/generated_include"));
     emit_rerun_for_tree(
         &workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
     );

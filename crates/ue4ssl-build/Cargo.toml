@@ -1,5 +1,5 @@
 [package]
-name = "ue4ssl-mod-build"
+name = "ue4ssl-build"
 edition = "2021"
 version = "0.1.0"
 publish = false

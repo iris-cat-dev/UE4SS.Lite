@@ -1,13 +1,10 @@
-#[path = "../build_support/common.rs"]
-mod common;
-
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use cc::Build;
-use common::{
+use ue4ssl_build::common::{
     cc_archive_path, emit_rerun_for_tree, require_paths_exist, whole_archive_flag,
     workspace_root_from_manifest_dir,
 };
