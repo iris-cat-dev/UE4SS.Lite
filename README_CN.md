@@ -68,10 +68,18 @@ rustup target add x86_64-pc-windows-msvc
 cargo ue4ssl-build --target x86_64-pc-windows-msvc --core-only
 ```
 
-在 macOS 上交叉编译核心 DLL 和 Lua/JavaScript 脚本引擎 DLL：
+在 macOS 上交叉编译核心 DLL、Lua/JavaScript 脚本引擎 DLL 和自动发现的原生 C++ Mod：
 
 ```sh
 cargo ue4ssl-build --target x86_64-pc-windows-msvc
+```
+
+原生 C++ Mod 会从 `Mods/<ModName>/native/cpp/` 自动发现。新增 Mod 不需要修改根 workspace，也不需要注册 `xtask` artifact。只构建原生 Mod 或指定某个原生 Mod：
+
+```sh
+cargo ue4ssl-mods list
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --mods-only
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --mod CPP_MeowChat
 ```
 
 这条交叉编译路线保留 Windows/MSVC ABI，产物仍是用于 Windows 游戏环境验证的 DLL。需要配置 Windows SDK/MSVC CRT 来源，例如 `cargo-xwin`/`xwin`，或在环境中提供等价的 `clang-cl`、`lld-link`、`llvm-lib`、Windows SDK、UCRT 和 MSVC CRT 路径。
@@ -106,7 +114,7 @@ cargo ue4ssl-install --destination "<Game>/Binaries/Win64/ue4ss"
 cargo ue4ssl-install --profile release --destination "<Game>/Binaries/Win64/ue4ss"
 ```
 
-package 步骤会根据嵌入 `crates/xtask` 的 artifact 元数据复制核心 DLL、脚本引擎 DLL、原生 Mod DLL、PDB 和配置的资源目录。
+package 步骤会复制核心 DLL、脚本引擎 DLL、自动发现的原生 Mod DLL、PDB 和配置的资源目录。使用 `--mod <name>` 可只暂存一个原生 Mod，不包含核心和脚本引擎。
 
 ## Proxy DLL
 

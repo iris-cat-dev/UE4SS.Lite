@@ -75,3 +75,4 @@ package-lock.json
 obj
 dist
 FSD-Win64-Shipping
+Cargo.lock

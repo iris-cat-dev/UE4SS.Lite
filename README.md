@@ -68,10 +68,18 @@ rustup target add x86_64-pc-windows-msvc
 cargo ue4ssl-build --target x86_64-pc-windows-msvc --core-only
 ```
 
-Cross-compile the core DLL plus Lua/JavaScript script engine DLLs from macOS:
+Cross-compile the core DLL, Lua/JavaScript script engine DLLs, and auto-discovered native C++ mods from macOS:
 
 ```sh
 cargo ue4ssl-build --target x86_64-pc-windows-msvc
+```
+
+Native C++ mods are discovered from `Mods/<ModName>/native/cpp/`. New mods do not need a root workspace entry or an `xtask` artifact registration. To build only native mods, or one native mod:
+
+```sh
+cargo ue4ssl-mods list
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --mods-only
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --mod CPP_MeowChat
 ```
 
 The cross-compile path keeps the Windows/MSVC ABI and produces Windows DLLs for validation on a Windows game install. Configure a Windows SDK/MSVC CRT provider such as `cargo-xwin`/`xwin`, or provide equivalent `clang-cl`, `lld-link`, `llvm-lib`, Windows SDK, UCRT, and MSVC CRT paths in the environment.
@@ -106,7 +114,7 @@ cargo ue4ssl-install --destination "<Game>/Binaries/Win64/ue4ss"
 cargo ue4ssl-install --profile release --destination "<Game>/Binaries/Win64/ue4ss"
 ```
 
-The package step copies the core DLL, script engine DLLs, native mod DLLs, PDBs, and any configured resources according to the artifact metadata embedded in `crates/xtask`.
+The package step copies the core DLL, script engine DLLs, auto-discovered native mod DLLs, PDBs, and any configured resources. Use `--mod <name>` to stage one native mod without the core or script engines.
 
 ## Proxy DLL
 

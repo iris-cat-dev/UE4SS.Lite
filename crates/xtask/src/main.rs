@@ -4,9 +4,10 @@ use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use native::{
-    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, core_artifacts,
-    default_artifacts, package_profile_dir, package_stage_dir, runtime_artifacts, ArtifactSpec,
-    CargoProfile, PackageKind,
+    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, built_native_mod_binary_path,
+    built_native_mod_pdb_path, core_artifacts, default_artifacts, discover_native_mods,
+    package_profile_dir, package_stage_dir, runtime_artifacts, select_native_mods,
+    write_generated_mod_workspace, ArtifactSpec, CargoProfile, NativeModSpec, PackageKind,
 };
 use xshell::{cmd, Shell};
 
@@ -28,6 +29,10 @@ enum Command {
         target: Option<String>,
         #[arg(long)]
         core_only: bool,
+        #[arg(long)]
+        mods_only: bool,
+        #[arg(long = "mod", value_name = "NAME")]
+        mod_names: Vec<String>,
     },
     BuildNativeSupport {
         #[arg(long, value_enum, default_value_t = ProfileArg::Dev)]
@@ -51,6 +56,10 @@ enum Command {
         #[arg(long)]
         core_only: bool,
         #[arg(long)]
+        mods_only: bool,
+        #[arg(long = "mod", value_name = "NAME")]
+        mod_names: Vec<String>,
+        #[arg(long)]
         no_build: bool,
     },
     PackageProxy {
@@ -71,6 +80,10 @@ enum Command {
         #[arg(long)]
         core_only: bool,
         #[arg(long)]
+        mods_only: bool,
+        #[arg(long = "mod", value_name = "NAME")]
+        mod_names: Vec<String>,
+        #[arg(long)]
         no_build: bool,
         #[arg(long)]
         destination: Utf8PathBuf,
@@ -87,7 +100,16 @@ enum Command {
         #[arg(long)]
         destination: Utf8PathBuf,
     },
+    Mods {
+        #[command(subcommand)]
+        command: ModsCommand,
+    },
     SyncAbi,
+}
+
+#[derive(Subcommand)]
+enum ModsCommand {
+    List,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -105,6 +127,30 @@ impl From<ProfileArg> for CargoProfile {
     }
 }
 
+#[derive(Clone, Debug)]
+struct BuildScope {
+    core_only: bool,
+    mods_only: bool,
+    mod_names: Vec<String>,
+}
+
+impl BuildScope {
+    fn new(core_only: bool, mods_only: bool, mod_names: Vec<String>) -> Result<Self> {
+        if core_only && (mods_only || !mod_names.is_empty()) {
+            bail!("--core-only cannot be combined with --mods-only or --mod");
+        }
+        Ok(Self {
+            core_only,
+            mods_only,
+            mod_names,
+        })
+    }
+
+    fn only_mods(&self) -> bool {
+        self.mods_only || !self.mod_names.is_empty()
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -112,7 +158,13 @@ fn main() -> Result<()> {
             profile,
             target,
             core_only,
-        } => build(profile.into(), target.as_deref(), core_only),
+            mods_only,
+            mod_names,
+        } => build(
+            profile.into(),
+            target.as_deref(),
+            BuildScope::new(core_only, mods_only, mod_names)?,
+        ),
         Command::BuildNativeSupport { profile, target } => {
             build_native_support(profile.into(), target.as_deref())
         }
@@ -125,9 +177,16 @@ fn main() -> Result<()> {
             profile,
             target,
             core_only,
+            mods_only,
+            mod_names,
             no_build,
         } => {
-            package(profile.into(), target.as_deref(), no_build, core_only)?;
+            package(
+                profile.into(),
+                target.as_deref(),
+                no_build,
+                BuildScope::new(core_only, mods_only, mod_names)?,
+            )?;
             Ok(())
         }
         Command::PackageProxy {
@@ -143,13 +202,15 @@ fn main() -> Result<()> {
             profile,
             target,
             core_only,
+            mods_only,
+            mod_names,
             no_build,
             destination,
         } => install(
             profile.into(),
             target.as_deref(),
             no_build,
-            core_only,
+            BuildScope::new(core_only, mods_only, mod_names)?,
             destination,
         ),
         Command::InstallProxy {
@@ -165,6 +226,7 @@ fn main() -> Result<()> {
             proxy_path,
             destination,
         ),
+        Command::Mods { command } => mods(command),
         Command::SyncAbi => sync_abi(),
     }
 }
@@ -207,7 +269,24 @@ fn sync_abi() -> Result<()> {
     Ok(())
 }
 
-fn build(profile: CargoProfile, target: Option<&str>, core_only: bool) -> Result<()> {
+fn mods(command: ModsCommand) -> Result<()> {
+    match command {
+        ModsCommand::List => {
+            let root = workspace_root()?;
+            for spec in discover_native_mods(&root)? {
+                println!(
+                    "{}\t{}\t{} sources",
+                    spec.mod_name,
+                    spec.package_name,
+                    spec.source_files.len()
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+fn build(profile: CargoProfile, target: Option<&str>, scope: BuildScope) -> Result<()> {
     sync_abi()?;
 
     let root = workspace_root()?;
@@ -215,7 +294,11 @@ fn build(profile: CargoProfile, target: Option<&str>, core_only: bool) -> Result
     prepare_cargo_shell(&shell, &root);
 
     build_artifacts(&shell, profile, target, core_artifacts(), "core artifacts")?;
-    if !core_only {
+    if scope.core_only {
+        return Ok(());
+    }
+
+    if !scope.only_mods() {
         build_artifacts(
             &shell,
             profile,
@@ -225,6 +308,7 @@ fn build(profile: CargoProfile, target: Option<&str>, core_only: bool) -> Result
         )?;
     }
 
+    build_native_mods(&shell, &root, profile, target, &scope.mod_names)?;
     Ok(())
 }
 
@@ -246,6 +330,32 @@ fn build_artifacts(
     }
 
     run_cargo_build(shell, profile, target, &package_args, label)
+}
+
+fn build_native_mods(
+    shell: &Shell,
+    root: &Utf8Path,
+    profile: CargoProfile,
+    target: Option<&str>,
+    requested_names: &[String],
+) -> Result<()> {
+    let discovered = discover_native_mods(root)?;
+    let selected = select_native_mods(&discovered, requested_names)?;
+    if selected.is_empty() {
+        return Ok(());
+    }
+
+    let generated_workspace = write_generated_mod_workspace(root, profile, target, &selected)?;
+    let mut package_args = vec![
+        "--manifest-path".to_owned(),
+        generated_workspace.join("Cargo.toml").to_string(),
+    ];
+    for spec in selected {
+        package_args.push("-p".to_owned());
+        package_args.push(spec.package_name.clone());
+    }
+
+    run_cargo_build(shell, profile, target, &package_args, "native mods")
 }
 
 fn build_native_support(profile: CargoProfile, target: Option<&str>) -> Result<()> {
@@ -288,19 +398,19 @@ fn package(
     profile: CargoProfile,
     target: Option<&str>,
     no_build: bool,
-    core_only: bool,
+    scope: BuildScope,
 ) -> Result<()> {
-    package_to_stage(profile, target, no_build, core_only).map(|_| ())
+    package_to_stage(profile, target, no_build, scope).map(|_| ())
 }
 
 fn install(
     profile: CargoProfile,
     target: Option<&str>,
     no_build: bool,
-    core_only: bool,
+    scope: BuildScope,
     destination: Utf8PathBuf,
 ) -> Result<()> {
-    let stage_dir = package_to_stage(profile, target, no_build, core_only)?;
+    let stage_dir = package_to_stage(profile, target, no_build, scope)?;
     copy_tree(&stage_dir, &destination)?;
     Ok(())
 }
@@ -367,10 +477,10 @@ fn package_to_stage(
     profile: CargoProfile,
     target: Option<&str>,
     no_build: bool,
-    core_only: bool,
+    scope: BuildScope,
 ) -> Result<Utf8PathBuf> {
     if !no_build {
-        build(profile, target, core_only)?;
+        build(profile, target, scope.clone())?;
     }
 
     let root = workspace_root()?;
@@ -382,8 +492,28 @@ fn package_to_stage(
     fs::create_dir_all(stage_dir.as_std_path())
         .with_context(|| format!("failed to create package dir {}", stage_dir))?;
 
-    for artifact in selected_artifacts(core_only) {
-        stage_artifact(&root, &stage_dir, profile, target, artifact)?;
+    let discovered = discover_native_mods(&root)?;
+    let selected_mods = if scope.core_only {
+        Vec::new()
+    } else {
+        select_native_mods(&discovered, &scope.mod_names)?
+    };
+
+    if scope.core_only {
+        for artifact in core_artifacts() {
+            stage_artifact(&root, &stage_dir, profile, target, artifact)?;
+        }
+    } else if scope.only_mods() {
+        for spec in selected_mods {
+            stage_native_mod(&root, &stage_dir, profile, target, spec)?;
+        }
+    } else {
+        for artifact in selected_artifacts(false) {
+            stage_artifact(&root, &stage_dir, profile, target, artifact)?;
+        }
+        for spec in selected_mods {
+            stage_native_mod(&root, &stage_dir, profile, target, spec)?;
+        }
     }
 
     Ok(stage_dir)
@@ -424,7 +554,7 @@ fn stage_artifact(
                 )?;
             }
         }
-        PackageKind::ScriptEngine | PackageKind::Mod => {
+        PackageKind::ScriptEngine => {
             let mod_name = artifact
                 .mod_directory_name
                 .context("mod artifact missing directory name")?;
@@ -436,13 +566,7 @@ fn stage_artifact(
                 copy_file(&pdb, &mod_dir.join("main.pdb"))?;
             }
 
-            let enabled = mod_dir.join("enabled.txt");
-            if !enabled.exists() {
-                fs::create_dir_all(mod_dir.as_std_path())
-                    .with_context(|| format!("failed to create mod dir {}", mod_dir))?;
-                fs::write(enabled.as_std_path(), b"")
-                    .with_context(|| format!("failed to write {}", enabled))?;
-            }
+            write_enabled_marker(&mod_dir)?;
 
             for extra_root in artifact.extra_stage_roots {
                 stage_extra_root(root, &mod_dir, extra_root)?;
@@ -450,6 +574,45 @@ fn stage_artifact(
         }
     }
 
+    Ok(())
+}
+
+fn stage_native_mod(
+    root: &Utf8Path,
+    stage_dir: &Utf8Path,
+    profile: CargoProfile,
+    target: Option<&str>,
+    spec: &NativeModSpec,
+) -> Result<()> {
+    let cargo_binary = built_native_mod_binary_path(root, profile, target, spec);
+    if !cargo_binary.exists() {
+        bail!("expected built native mod artifact at {}", cargo_binary);
+    }
+
+    let mod_dir = stage_dir.join("mods").join(&spec.mod_name);
+    copy_file(&cargo_binary, &mod_dir.join("main.dll"))?;
+
+    let pdb = built_native_mod_pdb_path(root, profile, target, spec);
+    if pdb.exists() {
+        copy_file(&pdb, &mod_dir.join("main.pdb"))?;
+    }
+
+    write_enabled_marker(&mod_dir)?;
+    for resource_root in &spec.resource_roots {
+        stage_resource_root(resource_root, &mod_dir)?;
+    }
+
+    Ok(())
+}
+
+fn write_enabled_marker(mod_dir: &Utf8Path) -> Result<()> {
+    fs::create_dir_all(mod_dir.as_std_path())
+        .with_context(|| format!("failed to create mod dir {}", mod_dir))?;
+    let enabled = mod_dir.join("enabled.txt");
+    if !enabled.exists() {
+        fs::write(enabled.as_std_path(), b"")
+            .with_context(|| format!("failed to write {}", enabled))?;
+    }
     Ok(())
 }
 
@@ -556,6 +719,15 @@ fn stage_extra_root(root: &Utf8Path, mod_dir: &Utf8Path, extra_root: &str) -> Re
     Ok(())
 }
 
+fn stage_resource_root(source: &Utf8Path, mod_dir: &Utf8Path) -> Result<()> {
+    if source.is_dir() {
+        copy_tree_contents(source, mod_dir)
+    } else {
+        let name = source.file_name().context("resource path is missing file name")?;
+        copy_file(source, &mod_dir.join(name))
+    }
+}
+
 fn copy_file(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent.as_std_path())
@@ -567,10 +739,7 @@ fn copy_file(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
     Ok(())
 }
 
-fn copy_tree(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
-    fs::create_dir_all(destination.as_std_path())
-        .with_context(|| format!("failed to create {}", destination))?;
-
+fn copy_tree_contents(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
     for entry in
         fs::read_dir(source.as_std_path()).with_context(|| format!("failed to read {}", source))?
     {
@@ -591,6 +760,13 @@ fn copy_tree(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn copy_tree(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
+    fs::create_dir_all(destination.as_std_path())
+        .with_context(|| format!("failed to create {}", destination))?;
+
+    copy_tree_contents(source, destination)
 }
 
 fn default_proxy_path() -> Utf8PathBuf {
