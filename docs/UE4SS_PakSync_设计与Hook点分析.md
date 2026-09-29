@@ -2,7 +2,7 @@
 
 > 目标游戏：Deep Rock Galactic / FSD  
 > 引擎版本：UE4.27  
-> 实现位置：`d:\Project\UE4SS.Lite\crates\ue4ssl-paksync`  
+> 实现位置：`d:\Project\UE4SS.Lite\Mods\ue4ssl-paksync`
 > 目标：主机通过 UE 网络通道把 pak 同步给客户端，客户端落盘校验后动态 mount，并保证在进入依赖资产的地图/任务前完成同步。
 
 ## 目标
@@ -46,7 +46,7 @@
 默认配置位于：
 
 ```text
-d:\Project\UE4SS.Lite\crates\ue4ssl-paksync\config\paksync.ini
+d:\Project\UE4SS.Lite\Mods\ue4ssl-paksync\config\paksync.ini
 ```
 
 当前默认值：
@@ -536,18 +536,17 @@ bool MountingToBeApplied;
 
 ### 构建与安装
 
-推荐用 `xtask install` 直接部署，避免手动复制漏文件或复制到错误目录：
+推荐使用 PakSync 部署脚本：它通过 `xtask` 先构建核心、再构建并打包选定 Mod，同时保留游戏专用工作目录的处理：
 
 ```powershell
 cd d:\Project\UE4SS.Lite
-cargo build -p ue4ssl-dll -p ue4ssl-paksync
-cargo run -p xtask -- install --no-build --destination "d:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss"
+.\Mods\ue4ssl-paksync\deploy.ps1 -Profile Release -PreserveConfig -NoPrune -Destination "d:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss"
 ```
 
 注意：
 
-- `xtask install --no-build` 会把 `crates/ue4ssl-paksync/config` 下的默认 `paksync.ini` 覆盖到游戏目录。
-- 每次 install 后，如果要实测，需要重新确认游戏目录里的配置。
+- `-SkipBuild` 跳过核心与 Mod 构建，但仍重新打包已有产物；`-PreserveConfig` 保留游戏目录中已有的 `paksync.ini`。
+- 通用 `xtask install --mod UE4SSL.PakSync` 只安装该 Mod，不复制核心，并会覆盖配置；需要同时更新核心时使用上述部署脚本。
 - 只改核心 UE4SSL.dll 时可用：
 
 ```powershell

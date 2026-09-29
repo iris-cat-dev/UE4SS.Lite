@@ -17,10 +17,10 @@ This document records facts already verified during the DRG PakSync debugging se
 
 ## Current Code Structure
 
-- `crates/ue4ssl-paksync/native/cpp/PakSync.cpp` remains the main PakSync runtime file.
+- `Mods/ue4ssl-paksync/native/cpp/PakSync.cpp` remains the main PakSync runtime file.
 - Legacy immediate hot-refresh code has been split into:
-  - `crates/ue4ssl-paksync/native/cpp/PakSync/LegacyHotRefresh.hpp`
-  - `crates/ue4ssl-paksync/native/cpp/PakSync/LegacyHotRefresh.cpp`
+  - `Mods/ue4ssl-paksync/native/cpp/PakSync/LegacyHotRefresh.hpp`
+  - `Mods/ue4ssl-paksync/native/cpp/PakSync/LegacyHotRefresh.cpp`
 - `PakSync.cpp` now calls the legacy branch through `m_legacy_refresh`.
 - The following implementation areas live in `LegacyHotRefresh.cpp`, not in the main runtime file:
   - AssetRegistry scan/retry after mount
@@ -295,15 +295,14 @@ Meaning: the pak overrides a package that was already known or loaded before the
 ## Working Test Commands
 
 ```powershell
-cargo check -p ue4ssl-paksync
-cargo build -p ue4ssl-paksync --release
-.\crates\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'D:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
+cargo ue4ssl-build --mod UE4SSL.PakSync --profile release
+.\Mods\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'D:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
 ```
 
 Client deployment path previously used:
 
 ```powershell
-.\crates\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'J:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
+.\Mods\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'J:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
 ```
 
 ## 2026-06-21 Refactor Verification
@@ -322,7 +321,7 @@ cargo build -p ue4ssl-paksync --release
 - Host deployment completed successfully:
 
 ```powershell
-.\crates\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'D:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
+.\Mods\ue4ssl-paksync\deploy.ps1 -SkipBuild -Destination 'D:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss'
 ```
 
 ## 2026-06-21 Resolver Lifetime Fix
@@ -351,8 +350,8 @@ cargo build -p ue4ssl-paksync --release
 
 - Restart/missing-pak prompts were changed from one-shot `MessageBoxW` dialogs to a small Win32 native status window.
 - New files:
-  - `crates/ue4ssl-paksync/native/cpp/PakSync/SyncStatusWindow.hpp`
-  - `crates/ue4ssl-paksync/native/cpp/PakSync/SyncStatusWindow.cpp`
+  - `Mods/ue4ssl-paksync/native/cpp/PakSync/SyncStatusWindow.hpp`
+  - `Mods/ue4ssl-paksync/native/cpp/PakSync/SyncStatusWindow.cpp`
 - The window runs on a separate Win32 UI thread so game/network hooks do not block on a modal dialog.
 - Current Chinese UI shows:
   - sync status text

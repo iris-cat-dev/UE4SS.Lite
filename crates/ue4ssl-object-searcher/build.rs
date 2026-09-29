@@ -1,4 +1,3 @@
-
 use std::env;
 use std::path::PathBuf;
 
@@ -6,9 +5,9 @@ use cc::Build;
 use ue4ssl_build::common::{
     add_defines, apply_common_defines, apply_common_msvc_flags, cc_archive_path, collect_sources,
     emit_rerun_for_tree, emit_static_archive_metadata, generate_abi_headers,
-    native_support_include_dirs, require_nonempty_sources, require_paths_exist,
-    unreal_base_include_dirs, unreal_include_dirs, unreal_root, workspace_root_from_manifest_dir,
-    BuildProfile,
+    object_searcher_include_dir, platform_include_dirs, require_nonempty_sources,
+    require_paths_exist, scanner_include_dir, unreal_sdk_include_dirs,
+    workspace_root_from_manifest_dir, BuildProfile,
 };
 
 fn main() {
@@ -26,31 +25,18 @@ fn main() {
     let generated = generate_abi_headers(&out_dir).expect("failed to generate ABI headers");
 
     let source_root = manifest_dir.join("native").join("src");
-    let include_root = manifest_dir.join("include");
-    let unreal_root = unreal_root(&workspace_root);
-    let include_dirs = object_searcher_include_dirs(&workspace_root, &generated.unreal_include);
+    let mut include_dirs = platform_include_dirs(&workspace_root);
+    include_dirs.extend(unreal_sdk_include_dirs(&workspace_root, &generated));
+    include_dirs.extend([
+        scanner_include_dir(&workspace_root),
+        object_searcher_include_dir(&workspace_root),
+    ]);
 
-    require_paths_exist(
-        "ue4ssl-object-searcher inputs",
-        [
-            source_root.clone(),
-            include_root.clone(),
-            unreal_root.join("include"),
-            unreal_root.join("generated_include"),
-            workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
-            workspace_root.join("crates/ue4ssl-hook/include"),
-        ],
-    );
-
-    for tracked in [
-        source_root.clone(),
-        include_root,
-        unreal_root.join("include"),
-        unreal_root.join("generated_include"),
-        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
-        workspace_root.join("crates/ue4ssl-hook/include"),
-    ] {
-        emit_rerun_for_tree(&tracked);
+    require_paths_exist("ue4ssl-object-searcher sources", [&source_root]);
+    require_paths_exist("ue4ssl-object-searcher includes", &include_dirs);
+    emit_rerun_for_tree(&source_root);
+    for include in &include_dirs {
+        emit_rerun_for_tree(include);
     }
 
     let mut build = Build::new();
@@ -94,17 +80,4 @@ fn main() {
 
     let archive = cc_archive_path(&out_dir, "ue4ssl_object_searcher_cpp");
     emit_static_archive_metadata("archive", &archive);
-}
-
-fn object_searcher_include_dirs(
-    workspace_root: &std::path::Path,
-    generated_unreal_include: &std::path::Path,
-) -> Vec<PathBuf> {
-    let mut dirs = native_support_include_dirs(workspace_root);
-    dirs.extend(unreal_base_include_dirs(workspace_root));
-    dirs.extend(unreal_include_dirs(
-        workspace_root,
-        Some(generated_unreal_include),
-    ));
-    dirs
 }

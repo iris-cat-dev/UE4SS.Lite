@@ -7,8 +7,8 @@
 - 主程序入口：`crates/ue4ssl-cpp-support/vendor/UE4SSL`
 - Unreal Hook 框架：`crates/ue4ssl-unreal-support/vendor/Unreal`
 - 运行时配置：`crates/ue4ssl-runtime/src/core/settings.rs`
-- JS 模块：`crates/ue4ssl-javascript`
-- Lua 模块：`crates/ue4ssl-lua`
+- JS 模块：`scripts/ue4ssl-javascript`
+- Lua 模块：`scripts/ue4ssl-lua`
 
 ## 先给结论
 
@@ -188,7 +188,7 @@ HookAActorTick = 0
 
 ## JS JSON 序列化卡顿排查
 
-重点文件：`crates/ue4ssl-javascript/native/cpp/JSHook.cpp`。
+重点文件：`scripts/ue4ssl-javascript/native/cpp/JSHook.cpp`。
 
 相关路径：
 
@@ -262,7 +262,7 @@ StaticConstructObject
 
 Lua 也会在 `on_program_start()` 注册 `StaticConstructObject` post callback，用于 `NotifyOnNewObject` 类似功能：
 
-文件：`crates/ue4ssl-lua/native/cpp/Mod/LuaMod.cpp`
+文件：`scripts/ue4ssl-lua/native/cpp/Mod/LuaMod.cpp`
 
 即使没有注册 Lua callback，也会进入这个 lambda 并做基础检查。Actor 大量生成时建议先移除 Lua 模块做基线。
 

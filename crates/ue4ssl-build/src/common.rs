@@ -69,6 +69,25 @@ pub fn target_dir(workspace_root: &Path, profile: BuildProfile) -> PathBuf {
     workspace_root.join("target").join(profile.cargo_dir())
 }
 
+pub fn emit_core_import_library_link(
+    workspace_root: &Path,
+    profile: BuildProfile,
+) -> io::Result<()> {
+    let import_lib = target_dir(workspace_root, profile).join("UE4SSL.dll.lib");
+    println!("cargo:rerun-if-changed={}", import_lib.display());
+    if !import_lib.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "expected UE4SSL import library at {}. Build the core artifact before engines or mods.",
+                import_lib.display()
+            ),
+        ));
+    }
+    println!("cargo:rustc-link-arg-cdylib={}", import_lib.display());
+    Ok(())
+}
+
 pub fn ue4ssl_cpp_root(workspace_root: &Path) -> PathBuf {
     workspace_root.join(UE4SSL_CPP_SUPPORT_ROOT)
 }
@@ -98,76 +117,66 @@ pub fn ue4ss_hook_root(workspace_root: &Path) -> PathBuf {
     workspace_root.join(UE4SS_HOOK_ROOT)
 }
 
-pub fn native_support_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
+pub fn platform_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
     [
         "crates/ue4ssl-platform/native/Input/include",
         UE4SSL_NATIVE_COMMON_INCLUDE_ROOT,
         "crates/ue4ssl-platform/native/DynamicOutput/include",
-        "crates/patternsleuth-bind/native/SinglePassSigScanner/include",
     ]
     .into_iter()
     .map(|relative| workspace_root.join(relative))
     .collect()
 }
 
-pub fn unreal_base_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
-    let unreal_root = unreal_root(workspace_root);
-    [
-        unreal_root.join("include").join("Function"),
-        workspace_root.join(UE4SSL_OBJECT_SEARCHER_INCLUDE_ROOT),
-        ue4ss_hook_root(workspace_root).join("include"),
-    ]
-    .into_iter()
-    .collect()
+pub fn scanner_include_dir(workspace_root: &Path) -> PathBuf {
+    workspace_root.join("crates/patternsleuth-bind/native/SinglePassSigScanner/include")
 }
 
-pub fn unreal_include_dirs(
+pub fn object_searcher_include_dir(workspace_root: &Path) -> PathBuf {
+    workspace_root.join(UE4SSL_OBJECT_SEARCHER_INCLUDE_ROOT)
+}
+
+// Public Unreal headers require both generated ABI roots. Platform, scanner, and
+// ObjectSearcher headers remain explicit capabilities at each call site.
+pub fn unreal_sdk_include_dirs(
     workspace_root: &Path,
-    generated_unreal_include: Option<&Path>,
+    generated: &GeneratedAbiIncludeRoots,
 ) -> Vec<PathBuf> {
     let unreal_root = unreal_root(workspace_root);
-    let mut dirs = vec![
+    vec![
         unreal_root.join("include"),
         unreal_root.join("generated_include"),
         unreal_root.join("include").join("Unreal"),
         unreal_root.join("include").join("Unreal").join("Core"),
-    ];
-    if let Some(generated_unreal_include) = generated_unreal_include {
-        dirs.push(generated_unreal_include.to_path_buf());
-    }
-    dirs
+        unreal_root.join("include").join("Function"),
+        ue4ss_hook_root(workspace_root).join("include"),
+        generated.unreal_include.clone(),
+        generated.ue4ssl_include.clone(),
+    ]
 }
 
-pub fn ue4ssl_include_dirs(
+pub fn ue4ssl_sdk_include_dirs(
     workspace_root: &Path,
-    generated_ue4ssl_include: Option<&Path>,
+    generated: &GeneratedAbiIncludeRoots,
 ) -> Vec<PathBuf> {
     let ue4ssl_root = ue4ssl_cpp_root(workspace_root);
     let mut dirs = vec![
         ue4ssl_root.join("include"),
         ue4ssl_root.join("generated_include"),
     ];
-    if let Some(generated_ue4ssl_include) = generated_ue4ssl_include {
-        dirs.push(generated_ue4ssl_include.to_path_buf());
-    }
+    dirs.extend(unreal_sdk_include_dirs(workspace_root, generated));
     dirs
 }
 
-pub fn common_native_include_dirs(
-    workspace_root: &Path,
-    generated_ue4ssl_include: Option<&Path>,
-    generated_unreal_include: Option<&Path>,
-) -> Vec<PathBuf> {
-    let mut dirs = native_support_include_dirs(workspace_root);
-    dirs.extend(unreal_base_include_dirs(workspace_root));
-    dirs.extend(ue4ssl_include_dirs(
-        workspace_root,
-        generated_ue4ssl_include,
-    ));
-    dirs.extend(unreal_include_dirs(
-        workspace_root,
-        generated_unreal_include,
-    ));
+pub fn unreal_source_include_dirs(workspace_root: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    for source in collect_sources(&unreal_root(workspace_root).join("src"), &["cpp"]) {
+        if let Some(parent) = source.parent() {
+            if !dirs.iter().any(|dir| dir == parent) {
+                dirs.push(parent.to_path_buf());
+            }
+        }
+    }
     dirs
 }
 

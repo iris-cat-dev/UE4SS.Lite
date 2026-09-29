@@ -5,6 +5,8 @@ param(
 
     [string] $Destination = 'D:\SteamLibrary\steamapps\common\Deep Rock Galactic\FSD\Binaries\Win64\ue4ss',
 
+    [string] $Target,
+
     [switch] $SkipBuild,
     [switch] $NoPrune,
     [switch] $PreserveConfig
@@ -69,18 +71,37 @@ function Remove-IfExists {
 }
 
 $repoRoot = Resolve-RepoRoot
-$profileArg = if ($Profile -eq 'Release') { @('--release') } else { @() }
+$cargoProfile = if ($Profile -eq 'Release') { 'release' } else { 'dev' }
 $profileDir = if ($Profile -eq 'Release') { 'release' } else { 'debug' }
-$targetDir = Join-Path $repoRoot "target\$profileDir"
+$targetRoot = Join-Path $repoRoot 'target'
+$packageRoot = Join-Path $targetRoot 'package'
+if ($Target) {
+    $targetRoot = Join-Path $targetRoot $Target
+    $packageRoot = Join-Path $packageRoot $Target
+}
+$targetDir = Join-Path $targetRoot $profileDir
+$stageDir = Join-Path (Join-Path $packageRoot $profileDir) 'ue4ss'
 
-if (-not $SkipBuild) {
-    $cargoArgs = @('build', '-p', 'ue4ssl-dll', '-p', 'ue4ssl-paksync') + $profileArg
+# xtask builds the core before PakSync and stages the Mod's declared resources.
+# Run at the repository root so Cargo loads its .cargo/config.toml as well.
+$cargoArgs = @('run', '-p', 'xtask', '--', 'package', '--profile', $cargoProfile, '--mod', 'UE4SSL.PakSync')
+if ($Target) {
+    $cargoArgs += @('--target', $Target)
+}
+if ($SkipBuild) {
+    $cargoArgs += '--no-build'
+}
+Push-Location -LiteralPath $repoRoot
+try {
     Invoke-Checked -FilePath 'cargo' -Arguments $cargoArgs
+} finally {
+    Pop-Location
 }
 
 $coreDll = Join-Path $targetDir 'UE4SSL.dll'
-$pakSyncDll = Join-Path $targetDir 'ue4ssl_paksync.dll'
-$pakSyncConfig = Join-Path (Split-Path -Parent $PSCommandPath) 'config\paksync.ini'
+$pakSyncStage = Join-Path $stageDir 'mods\UE4SSL.PakSync'
+$pakSyncDll = Join-Path $pakSyncStage 'main.dll'
+$pakSyncConfig = Join-Path $pakSyncStage 'config\paksync.ini'
 
 $ue4ssRoot = $Destination
 $gameSpecificRoot = Join-Path $ue4ssRoot 'Deep Rock Galactic'
@@ -101,6 +122,7 @@ Write-Host "Mod dir:     $pakSyncModRoot"
 
 Copy-RequiredFile -Source $coreDll -Target (Join-Path $ue4ssRoot 'UE4SSL.dll')
 Copy-RequiredFile -Source $pakSyncDll -Target (Join-Path $pakSyncModRoot 'main.dll')
+Copy-RequiredFile -Source (Join-Path $pakSyncStage 'enabled.txt') -Target (Join-Path $pakSyncModRoot 'enabled.txt')
 
 $deployedConfig = Join-Path $pakSyncModRoot 'config\paksync.ini'
 if ($PreserveConfig -and (Test-Path -LiteralPath $deployedConfig -PathType Leaf)) {

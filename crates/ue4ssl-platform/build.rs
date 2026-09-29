@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use cc::Build;
 use ue4ssl_build::common::{
     cc_archive_path, emit_rerun_for_tree, emit_static_archive_metadata, generate_abi_headers,
-    require_paths_exist, workspace_root_from_manifest_dir, BuildProfile, GeneratedAbiIncludeRoots,
+    platform_include_dirs, require_paths_exist, workspace_root_from_manifest_dir, BuildProfile,
+    GeneratedAbiIncludeRoots,
 };
 
 fn main() {
@@ -38,21 +39,14 @@ fn build_native_support(
         workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/src/OutputDevice.cpp"),
     ];
 
-    let includes = [
-        workspace_root.join("crates/ue4ssl-platform/native/Input/include"),
-        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
-        workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/include"),
-    ];
+    let includes = platform_include_dirs(workspace_root);
 
     require_paths_exist("ue4ssl-platform native sources", sources.iter());
     require_paths_exist("ue4ssl-platform native includes", includes.iter());
 
     for tracked in [
         workspace_root.join("crates/ue4ssl-platform/native/Input/src"),
-        workspace_root.join("crates/ue4ssl-platform/native/Input/include"),
-        workspace_root.join("crates/ue4ssl-platform/native/Common/include"),
         workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/src"),
-        workspace_root.join("crates/ue4ssl-platform/native/DynamicOutput/include"),
     ] {
         emit_rerun_for_tree(&tracked);
     }
@@ -69,6 +63,7 @@ fn build_native_support(
     build.include(&generated.ue4ssl_include);
 
     for include in includes {
+        emit_rerun_for_tree(&include);
         build.include(include);
     }
 

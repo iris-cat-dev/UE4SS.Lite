@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 use cc::Build;
 use ue4ssl_build::common::{
     add_defines, apply_common_defines, apply_common_msvc_flags, cc_archive_path, collect_sources,
-    common_native_include_dirs, define, emit_dylib_link, emit_rerun_for_tree, generate_abi_headers,
-    require_nonempty_sources, require_paths_exist, support_archive_from_env, ue4ssl_cpp_root,
-    version_defines, whole_archive_flag, workspace_root_from_manifest_dir, BuildProfile,
-    GeneratedAbiIncludeRoots,
+    define, emit_dylib_link, emit_rerun_for_tree, generate_abi_headers,
+    object_searcher_include_dir, platform_include_dirs, require_nonempty_sources,
+    require_paths_exist, scanner_include_dir, support_archive_from_env, ue4ssl_cpp_root,
+    ue4ssl_sdk_include_dirs, version_defines, whole_archive_flag, workspace_root_from_manifest_dir,
+    BuildProfile, GeneratedAbiIncludeRoots,
 };
 
 fn main() {
@@ -76,18 +77,11 @@ fn build_ue4ssl_cpp_support(
         "ue4ssl-dll cpp inputs",
         [
             core_src.clone(),
-            ue4ssl_root.join("include"),
-            ue4ssl_root.join("generated_include"),
             ue4ssl_root.join("generated_src").join("version.cache"),
         ],
     );
 
-    for tracked in [
-        core_src.clone(),
-        ue4ssl_root.join("include"),
-        ue4ssl_root.join("generated_include"),
-        ue4ssl_root.join("generated_src"),
-    ] {
+    for tracked in [core_src.clone(), ue4ssl_root.join("generated_src")] {
         emit_rerun_for_tree(&tracked);
     }
 
@@ -96,11 +90,15 @@ fn build_ue4ssl_cpp_support(
     apply_common_msvc_flags(&mut build, profile, true, "/std:c++23preview");
     apply_common_defines(&mut build, profile);
 
-    for include in common_native_include_dirs(
-        workspace_root,
-        Some(&generated.ue4ssl_include),
-        Some(&generated.unreal_include),
-    ) {
+    let mut include_dirs = platform_include_dirs(workspace_root);
+    include_dirs.extend(ue4ssl_sdk_include_dirs(workspace_root, generated));
+    include_dirs.extend([
+        scanner_include_dir(workspace_root),
+        object_searcher_include_dir(workspace_root),
+    ]);
+    require_paths_exist("ue4ssl-dll cpp includes", &include_dirs);
+    for include in include_dirs {
+        emit_rerun_for_tree(&include);
         build.include(include);
     }
 

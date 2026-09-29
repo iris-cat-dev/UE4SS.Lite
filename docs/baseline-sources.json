@@ -1,0 +1,1033 @@
+{
+  "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+  "capture_date": "2026-09-22",
+  "files": [
+    {
+      "path": "crates/ue4ssl-abi/src/lib.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "0f578c68c649e54087ac98e9aa28f7ddefd8c35cbab867fa14e1001b656068a8",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "8fb78cae5b2b67d4754d6ac2e6d0f1f4e4fbf3eaf51a2954fe160941ce852263",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-cpp-support/vendor/UE4SSL/src/UE4SSProgram.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "9591e3ed6a8c1a6ed457590fbc384d77e7824cc5ee4873ae22e47a570d71268b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "0c63ad3fe75ee032c52cc097bcb6d5ba207524c8a74f9ca68d4a6f4c9c4a6ef3",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSAudio.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "fade47683da86476d2212bbce2f8eb33702d1269b5ce8f014e0d76701a2c176b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "fade47683da86476d2212bbce2f8eb33702d1269b5ce8f014e0d76701a2c176b",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSDelegate.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "693139e937715f630a89a1d84f1965fccec851c4f5cb9e46b48768902470a98f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "693139e937715f630a89a1d84f1965fccec851c4f5cb9e46b48768902470a98f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSFetch.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "c334a44b4156fde788833ddce3be359d8407a7366c51c18fbaa9edd89509c6b8",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "c334a44b4156fde788833ddce3be359d8407a7366c51c18fbaa9edd89509c6b8",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSFileIO.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "74f13b4607ce0a74a75bd41bce3f2027ab09531cdb5fc9dc2ec6fb5bf8df67f0",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "74f13b4607ce0a74a75bd41bce3f2027ab09531cdb5fc9dc2ec6fb5bf8df67f0",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSGameThreadDispatcher.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "fc887f35482f43ae6fc4ac432e20a4f1f2a03eeebfaf70350b3148aa7c7222cf",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "fc887f35482f43ae6fc4ac432e20a4f1f2a03eeebfaf70350b3148aa7c7222cf",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSGlobalFunctions.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "6cf5c10630b9251402590021b6a77b29acbd91b88620d18ffaced872f214138e",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "6cf5c10630b9251402590021b6a77b29acbd91b88620d18ffaced872f214138e",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSHook.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "d060e4aca79862b16c2bedc70c69c26ded86f4d1bce7315ff9d8d47cf53a726c",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "a753614fe6a0261fa10023e2e3c8992507968ff2bbc2f5f772aaa4d87f07414b",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSMemory.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "3a1ea32c0f849cad52c777b928b8e0d9a7c5979e0ddabd408e8af5dc3a3504ed",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "3a1ea32c0f849cad52c777b928b8e0d9a7c5979e0ddabd408e8af5dc3a3504ed",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSMod.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "166931e448c3bfe19803d2f42cd52efabe7332680087b5ce84c42cddd8fe8f72",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "9b64954e4ffb4b388ee5ebaeeb1fbdf1e954989190956b42b4ada8ae771cfabf",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSPropertyAccess.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "530dcfa8fdfb20bc4b3ad33e1c3cedd0dff86881eafac349c29a805ba7c89d0f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "530dcfa8fdfb20bc4b3ad33e1c3cedd0dff86881eafac349c29a805ba7c89d0f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSPropertyUtils.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "ed00c062e7a8b44fee197488137ffe596a675e41b0404f4ec247cf0e964f0262",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "ed00c062e7a8b44fee197488137ffe596a675e41b0404f4ec247cf0e964f0262",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSRustBridge.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "6d717ca91476f7865ef7cf0cff1b8e78a4258abd0076e914a8d4f9b5d4c0674c",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "6d717ca91476f7865ef7cf0cff1b8e78a4258abd0076e914a8d4f9b5d4c0674c",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSTimer.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "40064f4ac402d3e42265927cc8e7a0d909fd4a071069783f404b985027ac2240",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "40064f4ac402d3e42265927cc8e7a0d909fd4a071069783f404b985027ac2240",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/JSType/JSUObject.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "bde939e049c5976313e864edb2874b95306c6ae612a1a3cf4980ef129178dbde",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "bde939e049c5976313e864edb2874b95306c6ae612a1a3cf4980ef129178dbde",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/cpp/dllmain.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "5243706d615fff017143b2f660350fd27657cd52eb1ee10c5ade8521b2286450",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "5243706d615fff017143b2f660350fd27657cd52eb1ee10c5ade8521b2286450",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/include/JSGameThreadDispatcher.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "4c0039a9ce83f2c390566618ed219134aefd93afe8fdbf68712f0350effa9b2b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "4c0039a9ce83f2c390566618ed219134aefd93afe8fdbf68712f0350effa9b2b",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/include/JSInternal.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "0b41846f844eae26ebfb6d22790e737466550b90ffc6cc333ac88f47400ea497",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "0b41846f844eae26ebfb6d22790e737466550b90ffc6cc333ac88f47400ea497",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/include/JSMod.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "5e07b27e2e5a6ca7ae5ae2a19c808908e5e586b4401bac0c5cf11b023802c3a6",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "5e07b27e2e5a6ca7ae5ae2a19c808908e5e586b4401bac0c5cf11b023802c3a6",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/native/include/JSType/JSUObject.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "b50f81d959f958981c1bdee97b4e098c09b1041de48629f28a7c4861a1344e7f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "b50f81d959f958981c1bdee97b4e098c09b1041de48629f28a7c4861a1344e7f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-javascript/src/lib.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "481e4fb11ad091159f261b29e0a9a7a6d689dcc44de99f07df530852f319d558",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "481e4fb11ad091159f261b29e0a9a7a6d689dcc44de99f07df530852f319d558",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaCompat.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "e981d7544404507101941457ee35ca24db775d6a3e738c9b3b3480cde6aeefc1",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "02e0425ecce3e1872e22315e3ea583cf343b91b91774c7ea30c014870369bc1b",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaEngineRegistry.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "22f19001673a35a24ccbd80767c474cc992366e81cedc23d8ef534cd273efdcf",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "22f19001673a35a24ccbd80767c474cc992366e81cedc23d8ef534cd273efdcf",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaLibrary.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "114aeff6b751bd23ae365877ce0258aaa5e47a45c5c7331e9c004034bb8e2423",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "114aeff6b751bd23ae365877ce0258aaa5e47a45c5c7331e9c004034bb8e2423",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaAActor.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "8207c06bcdd278225deb741e1694bb2ec6953a6bd6534bf8e232e50d0194e9fa",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "8207c06bcdd278225deb741e1694bb2ec6953a6bd6534bf8e232e50d0194e9fa",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaCustomProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "5d09334b383dac80d9c853f73da07f4e76ad128cc66a69628943857c6a774fbe",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "5d09334b383dac80d9c853f73da07f4e76ad128cc66a69628943857c6a774fbe",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFName.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "52328bd3bb082dc691250c6d2e8579d22dbe8942fdc6fba0df99b9744ca137c7",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "52328bd3bb082dc691250c6d2e8579d22dbe8942fdc6fba0df99b9744ca137c7",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFOutputDevice.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "0a9b7d0c3dd5d2e7d0a4e4d00d04e531326a29c0e4203744f78b0f86543cef89",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "0a9b7d0c3dd5d2e7d0a4e4d00d04e531326a29c0e4203744f78b0f86543cef89",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFSoftObjectPath.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "3c41f86217f7b893c966ed4066ceafb4484f86d8e76f47cbc2e1ed06a02e3c6f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "3c41f86217f7b893c966ed4066ceafb4484f86d8e76f47cbc2e1ed06a02e3c6f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFText.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "cde0699eff447cab498d3c767afffedbef6d7fb122e633481f7d2aed30f5749a",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "cde0699eff447cab498d3c767afffedbef6d7fb122e633481f7d2aed30f5749a",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFURL.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "3f86bb616754e0484e71ead8a38c798bafae6aa7ef7bb53054bcad529fb131f1",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "3f86bb616754e0484e71ead8a38c798bafae6aa7ef7bb53054bcad529fb131f1",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaFWeakObjectPtr.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "71a12c1891bfa3a542054f8f1521f9ac875fa4fd03b9ff5e76c7a33ce8e4a476",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "71a12c1891bfa3a542054f8f1521f9ac875fa4fd03b9ff5e76c7a33ce8e4a476",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaModRef.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "b02db355f975983330d1d4547953ddaab252c120a1f2e640219f3175e16e6ea8",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "b02db355f975983330d1d4547953ddaab252c120a1f2e640219f3175e16e6ea8",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaTArray.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "9cf2b0873b647a1a9320ab7cc66f9d7c6ed558f571f520d9c785bfffbc48e913",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "9cf2b0873b647a1a9320ab7cc66f9d7c6ed558f571f520d9c785bfffbc48e913",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaTMap.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "78fae50d9f2ad0e83fa35ea905393f51c30610253135e8f97cdec27eac370d44",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "78fae50d9f2ad0e83fa35ea905393f51c30610253135e8f97cdec27eac370d44",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaTSet.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "865c26f2625a8f52c9a24d070f6b7b09829c515862ac60571de37e7a23c30606",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "865c26f2625a8f52c9a24d070f6b7b09829c515862ac60571de37e7a23c30606",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaTSoftObjectPtr.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "19e5b95bec6380abb52b5286b1c148ae424ba81fdf5b65966ab57d773ae7df1f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "19e5b95bec6380abb52b5286b1c148ae424ba81fdf5b65966ab57d773ae7df1f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaThreadId.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "9894f6008458650c2cb81bb1610da06ceade5bba974f7f336b5b855155d6202a",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "9894f6008458650c2cb81bb1610da06ceade5bba974f7f336b5b855155d6202a",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUClass.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "58dd90682f89a4ae9eadeeffd232f52eeec73fefc9bbc5f1e67f5b5e3e1099b3",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "58dd90682f89a4ae9eadeeffd232f52eeec73fefc9bbc5f1e67f5b5e3e1099b3",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUDataTable.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "933ea1b7c67d2951bb07d3cabbf992cc3d4b5277428c3cef6ac6a707da579a72",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "933ea1b7c67d2951bb07d3cabbf992cc3d4b5277428c3cef6ac6a707da579a72",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUEnum.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "7d95df3e30ccc41e259d84edfadb662c4e926069badcae45871f1c35ba6fb756",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "7d95df3e30ccc41e259d84edfadb662c4e926069badcae45871f1c35ba6fb756",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUFunction.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "01d3b9cab1d66df01c0f1b3cd8047820ca64649c48c83787a8ecf4c4127a10f5",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "01d3b9cab1d66df01c0f1b3cd8047820ca64649c48c83787a8ecf4c4127a10f5",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUInterface.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "25a9437129b4be716c101c7c54c74568ba41c15b66be767758f18da7b213eddf",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "25a9437129b4be716c101c7c54c74568ba41c15b66be767758f18da7b213eddf",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUObject.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "d742c8e6e000eaac76644cbd83f9025dc377531678fff1b01cc506879d4b99db",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "d742c8e6e000eaac76644cbd83f9025dc377531678fff1b01cc506879d4b99db",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUScriptStruct.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "bb3d1e158fecb0c4b27fc3b4f8090beedca83ee1f5cff39c94d45d078131beed",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "bb3d1e158fecb0c4b27fc3b4f8090beedca83ee1f5cff39c94d45d078131beed",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUStruct.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "50a6a0eeaba317b11f60956d1da36bcb8565d44d088a29c759f4d23e30985b91",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "50a6a0eeaba317b11f60956d1da36bcb8565d44d088a29c759f4d23e30985b91",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaUWorld.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "18b0f4beec0593f55acae4cee5e46e696bb4187e8d4c1f0a0960d1eb5aea54d7",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "18b0f4beec0593f55acae4cee5e46e696bb4187e8d4c1f0a0960d1eb5aea54d7",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXArrayProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "93bf2b05f7e7b753c97c9a5756256df7870ba444d54b4202b6a5c1da5ef8f6b3",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "93bf2b05f7e7b753c97c9a5756256df7870ba444d54b4202b6a5c1da5ef8f6b3",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXBoolProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "20d488c5c44f062cded2ed66fe04031af72a9a36a524d69115de04bdece79ef2",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "20d488c5c44f062cded2ed66fe04031af72a9a36a524d69115de04bdece79ef2",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXDelegateProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "861aa9be77e70c56ccba9f20bb70da793c5d0b41ca4997c9bdd25fd6353e778a",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "861aa9be77e70c56ccba9f20bb70da793c5d0b41ca4997c9bdd25fd6353e778a",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXEnumProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "937ec4b84f14099696fb63f4c0bf2f7933bbc08e476bc51087be46f0596ca5f2",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "937ec4b84f14099696fb63f4c0bf2f7933bbc08e476bc51087be46f0596ca5f2",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXFieldClass.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "e74a8d74be2a6c27c5cc961234e0dc7bb0744ed656e7826a6769ca24a950c9d9",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "e74a8d74be2a6c27c5cc961234e0dc7bb0744ed656e7826a6769ca24a950c9d9",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXInterfaceProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "c2e221d15cf68394d42c223b769b338f4aba745118e69b06fa9cdcf6a9d659ad",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "c2e221d15cf68394d42c223b769b338f4aba745118e69b06fa9cdcf6a9d659ad",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXObjectProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "7540bce40fbe15c6b95aff150bfa881e845a9a3fa0e04fa301cd21c7d3e9f77e",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "7540bce40fbe15c6b95aff150bfa881e845a9a3fa0e04fa301cd21c7d3e9f77e",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "7adc2321f12d635b89866d0d825733a0d32152640759efded87b64dbbb015845",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "7adc2321f12d635b89866d0d825733a0d32152640759efded87b64dbbb015845",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/LuaType/LuaXStructProperty.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "806aff5219eca1b4e878e929db2f455788e34202327e15c3a7bd46252abc5d4c",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "806aff5219eca1b4e878e929db2f455788e34202327e15c3a7bd46252abc5d4c",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/Mod/LuaMod.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "d96dd2382696dab32ccfc6dc663604e3825b43c44a172cc2fc095c0e85ae1c55",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "401909fe91e19c2ae661835bf64527dbb533650e02e4e2d9038f27762e5cda28",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/cpp/dllmain.cpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "6c3ceee400bc3d21dffa63f489fb17ce11fc63b1d501a7b32030cba555b30bb3",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "6c3ceee400bc3d21dffa63f489fb17ce11fc63b1d501a7b32030cba555b30bb3",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/GUI/Dumpers.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "96af153bd0cbd5c727d97732267e763ab45c985765412adb72838a6b66c674ad",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "96af153bd0cbd5c727d97732267e763ab45c985765412adb72838a6b66c674ad",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaCompat.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "af4e8da68a79fe7ae7a643e0eaf9521084fef4162c28a259e99d14f3b2e5e88f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "af4e8da68a79fe7ae7a643e0eaf9521084fef4162c28a259e99d14f3b2e5e88f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaCustomMemberFunctions.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "cb1c94af40266ac781428251f9a22f82e7e960daf22752ba1c0b9a1c64f50f67",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "cb1c94af40266ac781428251f9a22f82e7e960daf22752ba1c0b9a1c64f50f67",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaEngineRegistry.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "c3b0cda42ef8a0e82b1b6eaa7fd62f1e7a52df6cf1a9d674a9cd7fdd09722c53",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "c3b0cda42ef8a0e82b1b6eaa7fd62f1e7a52df6cf1a9d674a9cd7fdd09722c53",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaLibrary.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "0b22123203186c5688eaacff34a7bccae1b269ae7f86ad6b5abda7106c174b7b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "0b22123203186c5688eaacff34a7bccae1b269ae7f86ad6b5abda7106c174b7b",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaScriptMemoryAccess.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "54c0661e0919399200fac42e43974eef9453636ace73ad31bc72e7d8a7f8e4ef",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "54c0661e0919399200fac42e43974eef9453636ace73ad31bc72e7d8a7f8e4ef",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaAActor.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "0d134bae9226a5f50edaa6100adc9a19e98e145e388350055bdeecebf8749b50",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "0d134bae9226a5f50edaa6100adc9a19e98e145e388350055bdeecebf8749b50",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaCustomProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "9db0724a5d1e93d947f07e85db7862c45d4d4ce495c0ced7968b0b89eedc02cb",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "9db0724a5d1e93d947f07e85db7862c45d4d4ce495c0ced7968b0b89eedc02cb",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFName.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "204f7d29317ad11809ea07222d03dba3b7dc45d1855140199d43aee9a54dc527",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "204f7d29317ad11809ea07222d03dba3b7dc45d1855140199d43aee9a54dc527",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFOutputDevice.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "1ea24988e1561fc74742403db2f0fe2303748d9a910261560dfccdaf9315c353",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "1ea24988e1561fc74742403db2f0fe2303748d9a910261560dfccdaf9315c353",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFSoftObjectPath.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "bbc0158206e02b65691888d9a37ca7e6590598a19567652ac053d8dc98c9accf",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "bbc0158206e02b65691888d9a37ca7e6590598a19567652ac053d8dc98c9accf",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFString.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "009ae961d3ddeba6b7419fa547e66ea53fe8c75a52d3808022bb571f777f9e0f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "009ae961d3ddeba6b7419fa547e66ea53fe8c75a52d3808022bb571f777f9e0f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFText.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "4d05db8ccf850f9f121b6a76baa2ebc27a28afafb81f26ffa51fc537ad53f26c",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "4d05db8ccf850f9f121b6a76baa2ebc27a28afafb81f26ffa51fc537ad53f26c",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFURL.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "4b9f43796135a01ce2568a32ac7d95a5ddb16fc3ae900071ca37a15bdbe3e465",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "4b9f43796135a01ce2568a32ac7d95a5ddb16fc3ae900071ca37a15bdbe3e465",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaFWeakObjectPtr.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "baa924b92d1fd9fe9cef76c9514b7b0b8e0cb1634783305e3aa0b42b9919be49",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "baa924b92d1fd9fe9cef76c9514b7b0b8e0cb1634783305e3aa0b42b9919be49",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaModRef.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "cfbb451def7f99ec6e8434f11c6e2af167591d16c6d81b1cfc65c42d0bdc30fe",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "cfbb451def7f99ec6e8434f11c6e2af167591d16c6d81b1cfc65c42d0bdc30fe",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaTArray.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "f97c6c4855d89b8d36722199106d2f7b4b3995b3f312d3fce29dbbeb0a92b0e2",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "f97c6c4855d89b8d36722199106d2f7b4b3995b3f312d3fce29dbbeb0a92b0e2",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaTMap.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "6f8e9384d61562f8c7690d581164472512bc853e2351844bd027d31e0c726499",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "6f8e9384d61562f8c7690d581164472512bc853e2351844bd027d31e0c726499",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaTSet.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "a1a8b162e09462579ff90f65087027f3796f0c0e0ef16d8ad55c6edf9631f544",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "a1a8b162e09462579ff90f65087027f3796f0c0e0ef16d8ad55c6edf9631f544",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaTSoftObjectPtr.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "8ec1e20dc753680a551d064a6488d8a2af5dc14fc1a0863d9031e352e73ceb61",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "8ec1e20dc753680a551d064a6488d8a2af5dc14fc1a0863d9031e352e73ceb61",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaThreadId.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "67962ac069638a99f61abafc13cd70b261c4da75a3444f1d6d329e88d487018a",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "67962ac069638a99f61abafc13cd70b261c4da75a3444f1d6d329e88d487018a",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUClass.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "5c35c7b6854f17fa0d2b1f5b9c8a99764f2ae7bf4e8168d0387f6c38988b28c7",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "5c35c7b6854f17fa0d2b1f5b9c8a99764f2ae7bf4e8168d0387f6c38988b28c7",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUDataTable.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "3245430717c89fc9dcc83e4c8319cbaad2c90a13305af0bd4aa2c6c3b1b5aa34",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "3245430717c89fc9dcc83e4c8319cbaad2c90a13305af0bd4aa2c6c3b1b5aa34",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUEnum.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "2c63468fd83775c41a34543c5693c83234a5232eb0359fb8748b0a0cd94207f4",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "2c63468fd83775c41a34543c5693c83234a5232eb0359fb8748b0a0cd94207f4",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUFunction.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "b651985f1818fb9a74e2932db4ad04b2a85a754138f0d21eb2ff3663c666cc6b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "b651985f1818fb9a74e2932db4ad04b2a85a754138f0d21eb2ff3663c666cc6b",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUInterface.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "afdc8211282be1cb624398a1d04439cc99b05773cce6d40e3176b9c75799ae54",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "afdc8211282be1cb624398a1d04439cc99b05773cce6d40e3176b9c75799ae54",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUObject.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "21b4a27aff3b37a74c8ea58a536ecc5925144c2965f63c771ec83b8bfb9910f2",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "21b4a27aff3b37a74c8ea58a536ecc5925144c2965f63c771ec83b8bfb9910f2",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUScriptStruct.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "a074858f3902a36cd476f66c3f41dbe241cc07c488f9902d6c285cb807216291",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "a074858f3902a36cd476f66c3f41dbe241cc07c488f9902d6c285cb807216291",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUStruct.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "2da9fd2c70ec89bef23c7a1ffe8214c27f05783582e47692f9713400d6b4ba5d",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "2da9fd2c70ec89bef23c7a1ffe8214c27f05783582e47692f9713400d6b4ba5d",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUWorld.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "e0e67ced73f105637521320235df7e3bca19adde49ce283a8264bd011b5c9c79",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "e0e67ced73f105637521320235df7e3bca19adde49ce283a8264bd011b5c9c79",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaUnrealString.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "29288fe8b147f634e8a1e6c2c8187b307e99ae4a73940f1215570853c19d49c4",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "29288fe8b147f634e8a1e6c2c8187b307e99ae4a73940f1215570853c19d49c4",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXArrayProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "7c5d91e36956eb388cee656013e13a98f47ee491b0a9acb7cc79f1e155d45f79",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "7c5d91e36956eb388cee656013e13a98f47ee491b0a9acb7cc79f1e155d45f79",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXBoolProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "cb829d3750098c47fc3138c1ce66107158766ade9f5b9968925603a4ed743495",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "cb829d3750098c47fc3138c1ce66107158766ade9f5b9968925603a4ed743495",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXDelegateProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "8da52acec84fbf6beaeeca5c451679a9af8b81419c96b5a8bab8950b9b9c09eb",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "8da52acec84fbf6beaeeca5c451679a9af8b81419c96b5a8bab8950b9b9c09eb",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXEnumProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "d2bf5cb9f39dc15cdbfacc9673248909901fe29ca78309c0eb6e521ce4890232",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "d2bf5cb9f39dc15cdbfacc9673248909901fe29ca78309c0eb6e521ce4890232",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXFieldClass.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "c1ff6ade67ef1550123c19970bcdd3cbe84467b2a0b26b67680b4ffbb476aec2",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "c1ff6ade67ef1550123c19970bcdd3cbe84467b2a0b26b67680b4ffbb476aec2",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXInterfaceProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "058b5d1082a3a24903ac4b31f6749ee4925a2ca33bd962a2282e7cd0f022e4a7",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "058b5d1082a3a24903ac4b31f6749ee4925a2ca33bd962a2282e7cd0f022e4a7",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXObjectProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "7e36667e137df8cfeaae0fb447a1b729c22b98139ca5176ae976e204d5accb59",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "7e36667e137df8cfeaae0fb447a1b729c22b98139ca5176ae976e204d5accb59",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "481cdba83913ed74e2b7f75652ed71ea28cbac1b52b7c0c825cca1ca1ea33852",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "481cdba83913ed74e2b7f75652ed71ea28cbac1b52b7c0c825cca1ca1ea33852",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/LuaType/LuaXStructProperty.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "21dde2e6c2d56de8a945c73a3fb1283030937eaa88007013dc0e5f264a152165",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "21dde2e6c2d56de8a945c73a3fb1283030937eaa88007013dc0e5f264a152165",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/Mod/LuaMod.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "597bfe69064c429de18d28780f2cd700a04eebad1f64f3f8faa4128803cf310e",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "597bfe69064c429de18d28780f2cd700a04eebad1f64f3f8faa4128803cf310e",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/UE4SSRuntime.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "a6de4ad7001734959d0a233b658ceab2940e766d6b065cbea87bcbd71d531503",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "a6de4ad7001734959d0a233b658ceab2940e766d6b065cbea87bcbd71d531503",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-lua/native/include/USMapGenerator/Generator.hpp",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "c467efcd5a710efdd7bab4c55a4455a97f34bc15114443121613faad507eed0e",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "c467efcd5a710efdd7bab4c55a4455a97f34bc15114443121613faad507eed0e",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/cpp_mod.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "fb9bfc1ddcc3c46cf15adbb47bbbbe6a8c8c999b1270bce5e27010e64e6ca24f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "48ecfe0a965cd1e4c37fb3c92270e2639c0d8c429644a7bd8fde46b0a89348c2",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/paths.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "89fbda47b16e268f6ea3409870a069f6c81be98a8dddf647291a0ac01541ba3e",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "89fbda47b16e268f6ea3409870a069f6c81be98a8dddf647291a0ac01541ba3e",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/host.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "27d7b75ce63463a40798e920232700950ef745f499e08799b1c73ccf271d758f",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "27d7b75ce63463a40798e920232700950ef745f499e08799b1c73ccf271d758f",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/mods.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "373f1e4cd3173930d035ecd356d251fbe97fba8b646c3e52e7b7ac9f4a332a6b",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "373f1e4cd3173930d035ecd356d251fbe97fba8b646c3e52e7b7ac9f4a332a6b",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/contract.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "319ad3c7a7c9976d7a41399c34c8871cce9291352dd20fef5a1fca56d567eff5",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "319ad3c7a7c9976d7a41399c34c8871cce9291352dd20fef5a1fca56d567eff5",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/state.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "05f3a404003fcf8f174c659c77231f205e4a8e51dbf42c1b5f8e08233bd50358",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "e4d6a7c1b37d8f6f2fcbbdd8a4f615d770b2845b215c76f9faf31273beb06bcc",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/ini.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "a52ea31c9e94195c315b1497000a0de2ed4bee9acf213398b1f2f149e93e2b73",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "a52ea31c9e94195c315b1497000a0de2ed4bee9acf213398b1f2f149e93e2b73",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/mod.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "895aed979bb5c1fd2c49a603eb96f8c33976e3ac5f0a624c4ba276b998f6f758",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "1c66c03ca204cf6e7daaa1fea1b9028dd46efe719da604661fc1ef13068048d2",
+      "worktree_differs": true,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/settings.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "8207f8978babc29944211e89a06909668735bfa34d0e78b9c93227b0b288dacb",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "8207f8978babc29944211e89a06909668735bfa34d0e78b9c93227b0b288dacb",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/core/wide.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "ffef05a08d30673440ef2985f361d2afbca6f71387b297544fd0d33948979de6",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "ffef05a08d30673440ef2985f361d2afbca6f71387b297544fd0d33948979de6",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    },
+    {
+      "path": "crates/ue4ssl-runtime/src/lib.rs",
+      "revision": "fff1f21dce7f671c8736a7907ff41ccb9c2faf32",
+      "sha256": "086e8c9ec92e5342ad2a3df013b61a830a5024bad180c91efe6b84e9f57f6138",
+      "worktree_observation": "2026-09-22 during concurrent migration; not session-start snapshot",
+      "observed_worktree_sha256": "086e8c9ec92e5342ad2a3df013b61a830a5024bad180c91efe6b84e9f57f6138",
+      "worktree_differs": false,
+      "worktree_provenance": "concurrent-or-preexisting; not attributed"
+    }
+  ],
+  "api_inventory": {
+    "lua_callable_registration_sites": 280,
+    "javascript_callables": 75,
+    "javascript_non_function_global": "UE4SS"
+  },
+  "limitations": [
+    "No session-start worktree snapshot",
+    "PE inspection is not Windows execution",
+    "Existing binary build revision is unknown"
+  ]
+}

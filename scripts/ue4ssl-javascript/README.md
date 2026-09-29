@@ -235,12 +235,15 @@ print("Version:", VERSION);
 
 ## Building
 
-JSScriptMod is built as part of the UE4SS cppmods. Make sure you have:
+The `ue4ssl-javascript` Cargo package lives under `scripts/` and builds the JavaScript plugin against the core SDK. Use the repository's Rust and MSVC toolchain requirements, then build from the repository root:
 
-1. CMake 3.15+
-2. C++20 compatible compiler
+```powershell
+cargo ue4ssl-build
+```
 
-The QuickJS source is provided by `crates/ue4ssl-javascript-support/vendor/quickjs/`.
+This builds the core before linking the script engines. For cross-compilation, add `--target x86_64-pc-windows-msvc`.
+
+The QuickJS source is provided by `scripts/ue4ssl-javascript-support/vendor/quickjs/`.
 
 ## Limitations
 
@@ -250,8 +253,8 @@ The QuickJS source is provided by `crates/ue4ssl-javascript-support/vendor/quick
 
 ## Stability Validation
 
-- Stress and release-gate checklist: keep this README's validation notes in sync with `crates/ue4ssl-javascript/native/cpp`.
+- Stress and release-gate checklist: keep this README's validation notes in sync with `scripts/ue4ssl-javascript/native/cpp`.
 
 ## License
 
-QuickJS is licensed under MIT. See `crates/ue4ssl-javascript-support/vendor/quickjs/LICENSE` for details.
+QuickJS is licensed under MIT. See `scripts/ue4ssl-javascript-support/vendor/quickjs/LICENSE` for details.

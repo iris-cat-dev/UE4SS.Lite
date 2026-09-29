@@ -20,7 +20,7 @@ fn main() {
 
     let workspace_root = workspace_root_from_manifest_dir(&manifest_dir);
 
-    let quickjs_dir = workspace_root.join("crates/ue4ssl-javascript-support/vendor/quickjs");
+    let quickjs_dir = workspace_root.join("scripts/ue4ssl-javascript-support/vendor/quickjs");
 
     require_paths_exist("ue4ssl-javascript-support", [&quickjs_dir]);
 

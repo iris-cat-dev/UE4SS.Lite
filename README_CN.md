@@ -17,7 +17,7 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 
 ## 仓库结构
 
-`crates/` 下恰好有 16 个 Cargo 包。原生源码放在实际负责构建它的模块内：
+`crates/` 包含核心、公共支撑库与构建工具；脚本引擎及其专用 VM 依赖位于 `scripts/`，用户 Mod 位于 `Mods/`。原生源码放在实际负责构建它的模块内：
 
 | 模块 | 职责 |
 |---|---|
@@ -26,6 +26,7 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 | `ue4ssl-platform` | Rust 输入、日志和文件服务；编译对应的 `native/Input`、`native/DynamicOutput` 薄适配，基础公共头位于 `native/Common`。 |
 | `ue4ssl-dll` | 核心 `UE4SSL.dll` 组装、启动和关闭；拥有并编译 `native/UE4SSL` 下的核心 C++ 边界代码。 |
 | `ue4ssl-unreal-support` | `vendor/Unreal` 下的引擎对象、布局、版本及原生调用适配；这是普通 vendor 源码树，不是 Git 子模块。 |
+| `ue4ssl-object-searcher` | 原生对象搜索实现及 `Unreal/ObjectSearch` 公共头；消费 Unreal 类型，由核心 DLL 与 Unreal support 一起链接其原生库。 |
 | `ue4ssl-hook` | Detour、IAT、指令地址辅助及对应 C++ 兼容头。 |
 | `patternsleuth-scanner` | 字节模式与交叉引用扫描算法。 |
 | `patternsleuth` | 映像、进程分析及地址解析器。 |
@@ -35,12 +36,24 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 | `ue4ssl-javascript` | JavaScript Mod 生命周期、Unreal/脚本绑定，生成 JS 插件 DLL。 |
 | `ue4ssl-javascript-support` | QuickJS 原生依赖。 |
 | `ue4ssl-proxy` | 原 DLL 导出转发与核心加载。 |
-| `ue4ssl-build` | 公共构建辅助、ABI 头同步及原生 Mod 编译。 |
-| `xtask` | 构建顺序、生成 Mod workspace、打包、安装及 Proxy 命令。 |
+| `ue4ssl-build` | 公共 SDK include 能力、核心 import library 链接、ABI 头同步及原生 Mod 编译。 |
+| `xtask` | 核心优先的构建顺序、统一 Mod 发现与选择、生成 Mod workspace、打包、安装及 Proxy 命令。 |
 
-`Mods/*/native` 是通过生成的 Cargo workspace 构建的原生 Mod。各构建脚本通过依赖 `ue4ssl-build` 复用工具，不再通过相对路径包含公共 Rust 源码。平台服务不编译核心或扫描适配；核心 DLL 负责组装并 whole-archive 链接各自归属的原生库。
+```text
+scripts/
+  ue4ssl-lua/                 Lua 引擎插件
+  ue4ssl-lua-support/         LuaRaw 与 LuaMadeSimple
+  ue4ssl-javascript/          JavaScript 引擎插件
+  ue4ssl-javascript-support/  QuickJS
+```
 
-`docs/baseline-*` 和 `docs/migration-validation.json` 是历史快照，其中旧源码路径与哈希有意保留，不改写成当前目录，以免伪造基线来源。
+后续引擎及专用依赖统一放入 `scripts/`。接入构建与打包时，在根 workspace 登记 Cargo 包，并在 `crates/xtask/src/native.rs` 的 `SCRIPT_ENGINE_ARTIFACTS` 登记插件产物。此次源码目录调整不改变包名、构建命令或部署目录 `mods/UE4SSL.Lua` / `mods/UE4SSL.JavaScript`。
+
+`Mods/` 支持两种构建后端：`ue4ssl-paksync` 等自带 Cargo workspace 包的 Mod，以及 `CPP_MeowChat/native` 等通过生成 Cargo workspace 构建的原生源码 Mod。两种后端使用同一套列表、选择与打包规则。
+
+各构建脚本依赖 `ue4ssl-build` 复用工具，不通过相对路径包含公共 Rust 源码。SDK include 辅助函数区分平台、Unreal/核心 SDK、扫描器与 ObjectSearcher；Unreal SDK 消费者获得两组生成 ABI 头，扫描器和 ObjectSearcher 依赖显式添加。平台服务不编译核心或扫描适配；核心 DLL 负责组装并 whole-archive 链接各自归属的原生库。
+
+冻结基线文档（`migration-baseline.md`、`script-api-baseline.md` 及 `known-defects.md` 中的基线证据）、`docs/baseline-*` 和 `docs/migration-validation.json` 是历史记录，其中旧源码路径与哈希有意保留，不改写成当前目录，以免伪造基线来源。
 
 ## 构建
 
@@ -82,19 +95,28 @@ rustup target add x86_64-pc-windows-msvc
 cargo ue4ssl-build --target x86_64-pc-windows-msvc --core-only
 ```
 
-在 macOS 上交叉编译核心 DLL、Lua/JavaScript 脚本引擎 DLL 和自动发现的原生 C++ Mod：
+在 macOS 上交叉编译核心 DLL、Lua/JavaScript 脚本引擎与全部发现的 Mod：
 
 ```sh
 cargo ue4ssl-build --target x86_64-pc-windows-msvc
 ```
 
-原生 C++ Mod 会从 `Mods/<ModName>/native/cpp/` 自动发现。新增 Mod 不需要修改根 workspace，也不需要注册 `xtask` artifact。只构建原生 Mod 或指定某个原生 Mod：
+Mod 从 `Mods/` 的直接子目录发现：
+
+- 自带 `Cargo.toml` 的 Mod 必须是根 workspace 成员，且具有 `cdylib` 目标。包名与 DLL 目标名从 Cargo 元数据读取，不需要在 `xtask` 中注册 artifact。
+- 不带 `Cargo.toml` 的 Mod 从 `native/cpp/` 编译，通过生成的 workspace 构建，无须加入根 workspace。
+- 可选的 `mod.json` 声明逻辑/部署名称 `name`（默认使用目录名）和 `resources`。约定的 `resources/` 内容直接覆盖到 Mod 部署目录；其他资源根保留末级目录名。PakSync 声明 `{"name":"UE4SSL.PakSync","resources":["config"]}`，对应 `mods/UE4SSL.PakSync/config/paksync.ini`。
+
+列出两种后端、只构建用户 Mod，或按逻辑名称选择 Mod（大小写不敏感，`--mod` 可重复）：
 
 ```sh
 cargo ue4ssl-mods list
 cargo ue4ssl-build --target x86_64-pc-windows-msvc --mods-only
 cargo ue4ssl-build --target x86_64-pc-windows-msvc --mod CPP_MeowChat
+cargo ue4ssl-build --target x86_64-pc-windows-msvc --mod UE4SSL.PakSync
 ```
+
+默认构建包含核心、脚本引擎和两种 Mod 后端。`--mods-only` 与 `--mod` 跳过脚本引擎，但仍先构建核心，确保 Mod 链接时的 `UE4SSL.dll.lib` 已更新。`--core-only` 排除所有引擎和 Mod。不要用一次无顺序保证的 `cargo build -p ...` 同时构建核心及依赖它的插件；公共构建辅助会跟踪核心 import library 的变化，触发依赖方重新链接。
 
 这条交叉编译路线保留 Windows/MSVC ABI，产物仍是用于 Windows 游戏环境验证的 DLL。需要配置 Windows SDK/MSVC CRT 来源，例如 `cargo-xwin`/`xwin`，或在环境中提供等价的 `clang-cl`、`lld-link`、`llvm-lib`、Windows SDK、UCRT 和 MSVC CRT 路径。
 
@@ -128,7 +150,20 @@ cargo ue4ssl-install --destination "<Game>/Binaries/Win64/ue4ss"
 cargo ue4ssl-install --profile release --destination "<Game>/Binaries/Win64/ue4ss"
 ```
 
-package 步骤会复制核心 DLL、脚本引擎 DLL、自动发现的原生 Mod DLL、PDB 和配置的资源目录。使用 `--mod <name>` 可只暂存一个原生 Mod，不包含核心和脚本引擎。
+package 步骤复制核心 DLL、脚本引擎、两种 Mod 后端、PDB、启用标记和配置的资源。`--mods-only` 只暂存全部用户 Mod；`--mod <name>` 只暂存选定的 Mod，不包含核心或脚本引擎。除非使用 `--no-build`，仍会先构建核心作为链接前置条件。
+
+```powershell
+cargo ue4ssl-package --mod UE4SSL.PakSync
+cargo ue4ssl-install --mod UE4SSL.PakSync --destination "<Game>/Binaries/Win64/ue4ss"
+```
+
+PakSync 部署脚本还会复制核心，并保留游戏专用工作目录的处理：
+
+```powershell
+.\Mods\ue4ssl-paksync\deploy.ps1 -Profile Release -Destination "<Game>/Binaries/Win64/ue4ss" -PreserveConfig
+```
+
+脚本从仓库根目录调用 `xtask package --mod UE4SSL.PakSync`，再部署暂存文件。`-SkipBuild` 传入 `--no-build`（仍执行打包）；`-Target <triple>` 选择交叉编译产物。`-NoPrune` 保留脚本原本会清理的可选产物和脚本引擎目录；`-PreserveConfig` 保留现有 `paksync.ini`。路径解析不依赖调用者的工作目录。
 
 ## Proxy DLL
 

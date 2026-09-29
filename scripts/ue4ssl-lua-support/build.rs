@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use ue4ssl_build::common::{
     collect_sources_in_dir, emit_rerun_for_tree, require_nonempty_sources, require_paths_exist,
-    workspace_root_from_manifest_dir, BuildProfile,
+    workspace_root_from_manifest_dir, BuildProfile, UE4SSL_NATIVE_COMMON_INCLUDE_ROOT,
 };
 
 fn main() {
@@ -17,9 +17,10 @@ fn main() {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("missing CARGO_MANIFEST_DIR"));
     let workspace_root = workspace_root_from_manifest_dir(&manifest_dir);
 
-    let lua_raw_dir = workspace_root.join("crates/ue4ssl-lua-support/vendor/LuaRaw");
-    let lua_made_simple_dir = workspace_root.join("crates/ue4ssl-lua-support/vendor/LuaMadeSimple");
-    let common_include = workspace_root.join("crates/ue4ssl-platform/native/Common/include");
+    let lua_raw_dir = workspace_root.join("scripts/ue4ssl-lua-support/vendor/LuaRaw");
+    let lua_made_simple_dir =
+        workspace_root.join("scripts/ue4ssl-lua-support/vendor/LuaMadeSimple");
+    let common_include = workspace_root.join(UE4SSL_NATIVE_COMMON_INCLUDE_ROOT);
 
     require_paths_exist(
         "ue4ssl-lua-support",

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use cc::Build;
 use ue4ssl_build::common::{
     cc_archive_path, emit_rerun_for_tree, emit_static_archive_metadata, require_paths_exist,
-    workspace_root_from_manifest_dir, BuildProfile,
+    scanner_include_dir, workspace_root_from_manifest_dir, BuildProfile,
 };
 
 fn main() {
@@ -26,7 +26,7 @@ fn main() {
     let profile = BuildProfile::from_env();
     let scanner_root = workspace_root.join("crates/patternsleuth-bind/native/SinglePassSigScanner");
     let source = scanner_root.join("src/SinglePassScannerShim.cpp");
-    let include = scanner_root.join("include");
+    let include = scanner_include_dir(&workspace_root);
     require_paths_exist(
         "patternsleuth_bind native scanner inputs",
         [&source, &include],

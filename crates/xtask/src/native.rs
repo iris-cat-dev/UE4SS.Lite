@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
+use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -57,18 +58,34 @@ pub struct ArtifactSpec {
     pub binary_name: &'static str,
     pub kind: PackageKind,
     pub mod_directory_name: Option<&'static str>,
-    pub extra_stage_roots: &'static [&'static str],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NativeModSpec {
+pub struct ModSpec {
     pub mod_name: String,
     pub mod_root: Utf8PathBuf,
     pub package_name: String,
     pub cargo_target_stem: String,
+    pub backend: ModBackend,
+    pub resources: Vec<ModResource>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ModBackend {
+    Cargo,
+    Generated(NativeModSources),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModResource {
+    pub source: Utf8PathBuf,
+    pub destination: Utf8PathBuf,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeModSources {
     pub source_files: Vec<Utf8PathBuf>,
     pub include_dirs: Vec<Utf8PathBuf>,
-    pub resource_roots: Vec<Utf8PathBuf>,
     pub link_libraries: Vec<String>,
     pub defines: BTreeMap<String, Option<String>>,
     pub compiler_flags: Vec<String>,
@@ -90,7 +107,8 @@ pub struct NativeModBuildInput {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-struct NativeModManifest {
+struct ModManifest {
+    name: Option<String>,
     source_dirs: Vec<String>,
     sources: Vec<String>,
     include_dirs: Vec<String>,
@@ -149,28 +167,28 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
         name: "ue4ssl_javascript_native",
         strategy: NativeStrategy::BuildRsToolchain,
         legacy_targets: &["UE4SSL.JavaScript"],
-        source_roots: &["crates/ue4ssl-javascript/native/cpp"],
+        source_roots: &["scripts/ue4ssl-javascript/native/cpp"],
         include_roots: &[
-            "crates/ue4ssl-javascript/native/include",
-            "crates/ue4ssl-javascript-support/vendor/quickjs",
+            "scripts/ue4ssl-javascript/native/include",
+            "scripts/ue4ssl-javascript-support/vendor/quickjs",
         ],
     },
     NativeGroup {
         name: "ue4ssl_javascript_support",
         strategy: NativeStrategy::BuildRsCc,
         legacy_targets: &["ue4ssl_javascript_support"],
-        source_roots: &["crates/ue4ssl-javascript-support/vendor/quickjs"],
-        include_roots: &["crates/ue4ssl-javascript-support/vendor/quickjs"],
+        source_roots: &["scripts/ue4ssl-javascript-support/vendor/quickjs"],
+        include_roots: &["scripts/ue4ssl-javascript-support/vendor/quickjs"],
     },
     NativeGroup {
         name: "ue4ssl_lua_native",
         strategy: NativeStrategy::BuildRsToolchain,
         legacy_targets: &["UE4SSL.Lua"],
-        source_roots: &["crates/ue4ssl-lua/native/cpp"],
+        source_roots: &["scripts/ue4ssl-lua/native/cpp"],
         include_roots: &[
-            "crates/ue4ssl-lua/native/include",
-            "crates/ue4ssl-lua-support/vendor/LuaMadeSimple/include",
-            "crates/ue4ssl-lua-support/vendor/LuaRaw/include",
+            "scripts/ue4ssl-lua/native/include",
+            "scripts/ue4ssl-lua-support/vendor/LuaMadeSimple/include",
+            "scripts/ue4ssl-lua-support/vendor/LuaRaw/include",
         ],
     },
     NativeGroup {
@@ -178,24 +196,13 @@ pub const NATIVE_GROUPS: &[NativeGroup] = &[
         strategy: NativeStrategy::BuildRsCc,
         legacy_targets: &["ue4ssl_lua_support", "LuaRaw", "LuaMadeSimple"],
         source_roots: &[
-            "crates/ue4ssl-lua-support/vendor/LuaRaw/src",
-            "crates/ue4ssl-lua-support/vendor/LuaMadeSimple/src",
+            "scripts/ue4ssl-lua-support/vendor/LuaRaw/src",
+            "scripts/ue4ssl-lua-support/vendor/LuaMadeSimple/src",
         ],
         include_roots: &[
-            "crates/ue4ssl-lua-support/vendor/LuaRaw/include",
-            "crates/ue4ssl-lua-support/vendor/LuaMadeSimple/include",
+            "scripts/ue4ssl-lua-support/vendor/LuaRaw/include",
+            "scripts/ue4ssl-lua-support/vendor/LuaMadeSimple/include",
         ],
-    },
-    NativeGroup {
-        name: "ue4ssl_paksync_native",
-
-        strategy: NativeStrategy::BuildRsToolchain,
-
-        legacy_targets: &["UE4SSL.PakSync"],
-
-        source_roots: &["crates/ue4ssl-paksync/native/cpp"],
-
-        include_roots: &["crates/ue4ssl-paksync/native/include"],
     },
     NativeGroup {
         name: "ue4ssl_proxy_native",
@@ -212,7 +219,6 @@ pub const CORE_ARTIFACTS: &[ArtifactSpec] = &[ArtifactSpec {
     binary_name: "UE4SSL",
     kind: PackageKind::CoreDll,
     mod_directory_name: None,
-    extra_stage_roots: &[],
 }];
 
 pub const SCRIPT_ENGINE_ARTIFACTS: &[ArtifactSpec] = &[
@@ -222,7 +228,6 @@ pub const SCRIPT_ENGINE_ARTIFACTS: &[ArtifactSpec] = &[
         binary_name: "UE4SSL.JavaScript",
         kind: PackageKind::ScriptEngine,
         mod_directory_name: Some("UE4SSL.JavaScript"),
-        extra_stage_roots: &[],
     },
     ArtifactSpec {
         package_name: "ue4ssl-lua",
@@ -230,44 +235,26 @@ pub const SCRIPT_ENGINE_ARTIFACTS: &[ArtifactSpec] = &[
         binary_name: "UE4SSL.Lua",
         kind: PackageKind::ScriptEngine,
         mod_directory_name: Some("UE4SSL.Lua"),
-        extra_stage_roots: &[],
     },
 ];
-
-pub const MOD_ARTIFACTS: &[ArtifactSpec] = &[ArtifactSpec {
-    package_name: "ue4ssl-paksync",
-
-    cargo_target_stem: "ue4ssl_paksync",
-
-    binary_name: "UE4SSL.PakSync",
-
-    kind: PackageKind::Mod,
-
-    mod_directory_name: Some("UE4SSL.PakSync"),
-
-    extra_stage_roots: &["crates/ue4ssl-paksync/config"],
-}];
 
 pub fn artifact_by_package(package_name: &str) -> Option<&'static ArtifactSpec> {
     default_artifacts().find(|artifact| artifact.package_name == package_name)
 }
 
 pub fn default_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    CORE_ARTIFACTS
-        .iter()
-        .chain(SCRIPT_ENGINE_ARTIFACTS.iter())
-        .chain(MOD_ARTIFACTS.iter())
+    CORE_ARTIFACTS.iter().chain(SCRIPT_ENGINE_ARTIFACTS.iter())
 }
 
 pub fn core_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
     CORE_ARTIFACTS.iter()
 }
 
-pub fn runtime_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
-    SCRIPT_ENGINE_ARTIFACTS.iter().chain(MOD_ARTIFACTS.iter())
+pub fn script_engine_artifacts() -> impl Iterator<Item = &'static ArtifactSpec> {
+    SCRIPT_ENGINE_ARTIFACTS.iter()
 }
 
-pub fn discover_native_mods(workspace_root: &Utf8Path) -> Result<Vec<NativeModSpec>> {
+pub fn discover_mods(workspace_root: &Utf8Path) -> Result<Vec<ModSpec>> {
     let mods_root = workspace_root.join("Mods");
     if !mods_root.is_dir() {
         return Ok(Vec::new());
@@ -280,6 +267,7 @@ pub fn discover_native_mods(workspace_root: &Utf8Path) -> Result<Vec<NativeModSp
     entries.sort_by_key(|entry| entry.file_name());
 
     let mut specs = Vec::new();
+    let mut cargo_metadata = None;
     for entry in entries {
         if !entry
             .file_type()
@@ -291,103 +279,56 @@ pub fn discover_native_mods(workspace_root: &Utf8Path) -> Result<Vec<NativeModSp
 
         let mod_root = Utf8PathBuf::from_path_buf(entry.path())
             .map_err(|path| anyhow::anyhow!("non-UTF8 mod path {}", path.display()))?;
-        let mod_name = mod_root
+        let directory_name = mod_root
             .file_name()
-            .context("mod directory is missing a name")?
-            .to_owned();
-        if mod_name.eq_ignore_ascii_case("shared") {
+            .context("mod directory is missing a name")?;
+        if directory_name.eq_ignore_ascii_case("shared") {
             continue;
         }
 
         let default_source_dir = mod_root.join("native").join("cpp");
-        if !default_source_dir.is_dir() {
+        let cargo_manifest = mod_root.join("Cargo.toml");
+        if !cargo_manifest.is_file() && !default_source_dir.is_dir() {
             continue;
         }
 
         let manifest = read_mod_manifest(&mod_root)?;
-        let mut source_dirs = if manifest.source_dirs.is_empty() {
-            vec![default_source_dir]
-        } else {
-            manifest
-                .source_dirs
-                .iter()
-                .map(|path| mod_relative_path(&mod_root, path))
-                .collect::<Result<Vec<_>>>()?
-        };
-        source_dirs.sort();
-        source_dirs.dedup();
-
-        let mut source_files = Vec::new();
-        for source_dir in &source_dirs {
-            if !source_dir.is_dir() {
-                bail!("native mod {mod_name} source dir does not exist: {source_dir}");
-            }
-            collect_cpp_sources(source_dir, &mut source_files)?;
+        let mod_name = manifest
+            .name
+            .clone()
+            .unwrap_or_else(|| directory_name.to_owned());
+        if mod_name.trim().is_empty()
+            || matches!(mod_name.as_str(), "." | "..")
+            || mod_name.contains(['/', '\\', ':'])
+        {
+            bail!("invalid Mod name '{mod_name}' in {mod_root}");
         }
-        for source in &manifest.sources {
-            let source = mod_relative_path(&mod_root, source)?;
-            if !source.is_file() {
-                bail!("native mod {mod_name} source file does not exist: {source}");
+        let resources = discover_resources(&mod_root, &manifest)?;
+        if cargo_manifest.is_file() {
+            if cargo_metadata.is_none() {
+                cargo_metadata = Some(read_cargo_metadata(workspace_root)?);
             }
-            if !is_cpp_source(&source) {
-                bail!("native mod {mod_name} source file is not C++: {source}");
-            }
-            source_files.push(source);
-        }
-        source_files.sort();
-        source_files.dedup();
-        if source_files.is_empty() {
-            bail!("native mod {mod_name} has no C++ sources under native/cpp");
+            let metadata = cargo_metadata.as_ref().expect("Cargo metadata was loaded");
+            let (package_name, cargo_target_stem) = resolve_cargo_mod(metadata, &cargo_manifest)?;
+            specs.push(ModSpec {
+                mod_name,
+                mod_root,
+                package_name,
+                cargo_target_stem,
+                backend: ModBackend::Cargo,
+                resources,
+            });
+            continue;
         }
 
-        let mut include_dirs = Vec::new();
-        for default_include in [
-            mod_root.join("native").join("include"),
-            mod_root.join("include"),
-        ] {
-            if default_include.is_dir() {
-                include_dirs.push(default_include);
-            }
-        }
-        for include_dir in &manifest.include_dirs {
-            let include_dir = mod_relative_path(&mod_root, include_dir)?;
-            if !include_dir.is_dir() {
-                bail!("native mod {mod_name} include dir does not exist: {include_dir}");
-            }
-            include_dirs.push(include_dir);
-        }
-        include_dirs.sort();
-        include_dirs.dedup();
-
-        let mut resource_roots = Vec::new();
-        let default_resources = mod_root.join("resources");
-        if default_resources.is_dir() {
-            resource_roots.push(default_resources);
-        }
-        for resource in &manifest.resources {
-            let resource = mod_relative_path(&mod_root, resource)?;
-            if !resource.exists() {
-                bail!("native mod {mod_name} resource path does not exist: {resource}");
-            }
-            resource_roots.push(resource);
-        }
-        resource_roots.sort();
-        resource_roots.dedup();
-
-        specs.push(NativeModSpec {
+        let sources = discover_native_sources(&mod_root, &mod_name, default_source_dir, manifest)?;
+        specs.push(ModSpec {
             package_name: format!("ue4ssl-auto-mod-{}", sanitize_for_package(&mod_name)),
             cargo_target_stem: format!("ue4ssl_mod_{}", sanitize_for_library(&mod_name)),
             mod_name,
             mod_root,
-            source_files,
-            include_dirs,
-            resource_roots,
-            link_libraries: manifest.link_libraries,
-            defines: manifest.defines,
-            compiler_flags: manifest.compiler_flags,
-            cpp_standard: manifest
-                .cpp_standard
-                .unwrap_or_else(|| "/std:c++23preview".to_owned()),
+            backend: ModBackend::Generated(sources),
+            resources,
         });
     }
 
@@ -395,10 +336,187 @@ pub fn discover_native_mods(workspace_root: &Utf8Path) -> Result<Vec<NativeModSp
     Ok(specs)
 }
 
-pub fn select_native_mods<'a>(
-    mods: &'a [NativeModSpec],
+fn discover_native_sources(
+    mod_root: &Utf8Path,
+    mod_name: &str,
+    default_source_dir: Utf8PathBuf,
+    manifest: ModManifest,
+) -> Result<NativeModSources> {
+    let mut source_dirs = if manifest.source_dirs.is_empty() {
+        vec![default_source_dir]
+    } else {
+        manifest
+            .source_dirs
+            .iter()
+            .map(|path| mod_relative_path(&mod_root, path))
+            .collect::<Result<Vec<_>>>()?
+    };
+    source_dirs.sort();
+    source_dirs.dedup();
+
+    let mut source_files = Vec::new();
+    for source_dir in &source_dirs {
+        if !source_dir.is_dir() {
+            bail!("native mod {mod_name} source dir does not exist: {source_dir}");
+        }
+        collect_cpp_sources(source_dir, &mut source_files)?;
+    }
+    for source in &manifest.sources {
+        let source = mod_relative_path(&mod_root, source)?;
+        if !source.is_file() {
+            bail!("native mod {mod_name} source file does not exist: {source}");
+        }
+        if !is_cpp_source(&source) {
+            bail!("native mod {mod_name} source file is not C++: {source}");
+        }
+        source_files.push(source);
+    }
+    source_files.sort();
+    source_files.dedup();
+    if source_files.is_empty() {
+        bail!("native mod {mod_name} has no C++ sources under native/cpp");
+    }
+
+    let mut include_dirs = Vec::new();
+    for default_include in [
+        mod_root.join("native").join("include"),
+        mod_root.join("include"),
+    ] {
+        if default_include.is_dir() {
+            include_dirs.push(default_include);
+        }
+    }
+    for include_dir in &manifest.include_dirs {
+        let include_dir = mod_relative_path(&mod_root, include_dir)?;
+        if !include_dir.is_dir() {
+            bail!("native mod {mod_name} include dir does not exist: {include_dir}");
+        }
+        include_dirs.push(include_dir);
+    }
+    include_dirs.sort();
+    include_dirs.dedup();
+
+    Ok(NativeModSources {
+        source_files,
+        include_dirs,
+        link_libraries: manifest.link_libraries,
+        defines: manifest.defines,
+        compiler_flags: manifest.compiler_flags,
+        cpp_standard: manifest
+            .cpp_standard
+            .unwrap_or_else(|| "/std:c++23preview".to_owned()),
+    })
+}
+
+fn discover_resources(mod_root: &Utf8Path, manifest: &ModManifest) -> Result<Vec<ModResource>> {
+    let mut resources = Vec::new();
+    let default_resources = mod_root.join("resources");
+    if default_resources.is_dir() {
+        resources.push(ModResource {
+            source: default_resources.clone(),
+            destination: Utf8PathBuf::new(),
+        });
+    }
+    for resource in &manifest.resources {
+        let source = mod_relative_path(mod_root, resource)?;
+        if !source.exists() {
+            bail!("Mod resource path does not exist: {source}");
+        }
+        // The conventional resources directory is an overlay. Other explicit
+        // roots retain their name, such as config/paksync.ini.
+        let destination = if source == default_resources {
+            Utf8PathBuf::new()
+        } else {
+            Utf8PathBuf::from(
+                source
+                    .file_name()
+                    .context("resource path is missing a name")?,
+            )
+        };
+        resources.push(ModResource {
+            source,
+            destination,
+        });
+    }
+    resources.sort_by(|a, b| a.source.cmp(&b.source));
+    resources.dedup();
+    Ok(resources)
+}
+
+#[derive(Deserialize)]
+struct CargoMetadata {
+    packages: Vec<CargoPackage>,
+    workspace_members: HashSet<String>,
+}
+
+#[derive(Deserialize)]
+struct CargoPackage {
+    id: String,
+    name: String,
+    manifest_path: String,
+    targets: Vec<CargoTarget>,
+}
+
+#[derive(Deserialize)]
+struct CargoTarget {
+    name: String,
+    crate_types: Vec<String>,
+}
+
+fn read_cargo_metadata(workspace_root: &Utf8Path) -> Result<CargoMetadata> {
+    let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+        .current_dir(workspace_root)
+        .args([
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--manifest-path",
+        ])
+        .arg(workspace_root.join("Cargo.toml"))
+        .output()
+        .context("failed to run cargo metadata for Mod discovery")?;
+    if !output.status.success() {
+        bail!(
+            "cargo metadata failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    serde_json::from_slice(&output.stdout).context("failed to decode cargo metadata")
+}
+
+fn resolve_cargo_mod(metadata: &CargoMetadata, manifest: &Utf8Path) -> Result<(String, String)> {
+    let canonical_manifest =
+        fs::canonicalize(manifest).with_context(|| format!("failed to resolve {manifest}"))?;
+    let package = metadata
+        .packages
+        .iter()
+        .find(|package| {
+            fs::canonicalize(&package.manifest_path).is_ok_and(|path| path == canonical_manifest)
+        })
+        .with_context(|| format!("Cargo Mod {manifest} is not a workspace package"))?;
+    if !metadata.workspace_members.contains(&package.id) {
+        bail!("Cargo Mod {manifest} is not a workspace member");
+    }
+    let mut targets = package.targets.iter().filter(|target| {
+        target
+            .crate_types
+            .iter()
+            .any(|crate_type| crate_type == "cdylib")
+    });
+    let target = targets
+        .next()
+        .with_context(|| format!("Cargo Mod {} requires a cdylib target", package.name))?;
+    if targets.next().is_some() {
+        bail!("Cargo Mod {} has multiple cdylib targets", package.name);
+    }
+    Ok((package.name.clone(), target.name.replace('-', "_")))
+}
+
+pub fn select_mods<'a>(
+    mods: &'a [ModSpec],
     requested_names: &[String],
-) -> Result<Vec<&'a NativeModSpec>> {
+) -> Result<Vec<&'a ModSpec>> {
     if requested_names.is_empty() {
         return Ok(mods.iter().collect());
     }
@@ -421,7 +539,7 @@ pub fn select_native_mods<'a>(
                 .map(|spec| spec.mod_name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ");
-            bail!("unknown native mod '{requested}'. Available native mods: {available}");
+            bail!("unknown Mod '{requested}'. Available Mods: {available}");
         };
         selected.push(*spec);
     }
@@ -433,7 +551,7 @@ pub fn write_generated_mod_workspace(
     workspace_root: &Utf8Path,
     profile: CargoProfile,
     target: Option<&str>,
-    mods: &[&NativeModSpec],
+    mods: &[&ModSpec],
 ) -> Result<Utf8PathBuf> {
     let workspace_dir = generated_mod_workspace_dir(workspace_root, profile, target);
     if workspace_dir.exists() {
@@ -449,6 +567,9 @@ pub fn write_generated_mod_workspace(
 
     let mut members = Vec::new();
     for spec in mods {
+        let ModBackend::Generated(sources) = &spec.backend else {
+            continue;
+        };
         let package_dir = packages_dir.join(&spec.package_name);
         let src_dir = package_dir.join("src");
         fs::create_dir_all(src_dir.as_std_path())
@@ -474,12 +595,20 @@ pub fn write_generated_mod_workspace(
         let input = NativeModBuildInput {
             mod_name: spec.mod_name.clone(),
             workspace_root: workspace_root.to_string(),
-            source_files: spec.source_files.iter().map(ToString::to_string).collect(),
-            include_dirs: spec.include_dirs.iter().map(ToString::to_string).collect(),
-            link_libraries: spec.link_libraries.clone(),
-            defines: spec.defines.clone(),
-            compiler_flags: spec.compiler_flags.clone(),
-            cpp_standard: spec.cpp_standard.clone(),
+            source_files: sources
+                .source_files
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+            include_dirs: sources
+                .include_dirs
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+            link_libraries: sources.link_libraries.clone(),
+            defines: sources.defines.clone(),
+            compiler_flags: sources.compiler_flags.clone(),
+            cpp_standard: sources.cpp_standard.clone(),
             archive_stem: format!("{}_cpp", spec.cargo_target_stem),
         };
         let input =
@@ -499,24 +628,6 @@ pub fn write_generated_mod_workspace(
     write_if_changed(&workspace_dir.join("Cargo.toml"), &workspace_toml)?;
 
     Ok(workspace_dir)
-}
-
-pub fn built_native_mod_binary_path(
-    workspace_root: &Utf8Path,
-    profile: CargoProfile,
-    target: Option<&str>,
-    spec: &NativeModSpec,
-) -> Utf8PathBuf {
-    artifact_binary_path(workspace_root, profile, target, &spec.cargo_target_stem)
-}
-
-pub fn built_native_mod_pdb_path(
-    workspace_root: &Utf8Path,
-    profile: CargoProfile,
-    target: Option<&str>,
-    spec: &NativeModSpec,
-) -> Utf8PathBuf {
-    artifact_pdb_path(workspace_root, profile, target, &spec.cargo_target_stem)
 }
 
 pub fn generated_mod_workspace_dir(
@@ -594,10 +705,10 @@ pub fn package_stage_dir(
     package_profile_dir(workspace_root, profile, target).join("ue4ss")
 }
 
-fn read_mod_manifest(mod_root: &Utf8Path) -> Result<NativeModManifest> {
+fn read_mod_manifest(mod_root: &Utf8Path) -> Result<ModManifest> {
     let manifest_path = mod_root.join("mod.json");
     if !manifest_path.exists() {
-        return Ok(NativeModManifest::default());
+        return Ok(ModManifest::default());
     }
 
     let text = fs::read_to_string(manifest_path.as_std_path())
@@ -643,7 +754,7 @@ fn is_cpp_source(path: &Utf8Path) -> bool {
     )
 }
 
-fn validate_unique_mods(specs: &[NativeModSpec]) -> Result<()> {
+fn validate_unique_mods(specs: &[ModSpec]) -> Result<()> {
     let mut mod_names = HashMap::new();
     let mut package_names = HashMap::new();
     let mut target_stems = HashMap::new();
@@ -659,13 +770,13 @@ fn validate_unique_mods(specs: &[NativeModSpec]) -> Result<()> {
             &mut package_names,
             spec.package_name.clone(),
             &spec.mod_name,
-            "generated package name",
+            "Cargo package name",
         )?;
         insert_unique(
             &mut target_stems,
             spec.cargo_target_stem.clone(),
             &spec.mod_name,
-            "generated DLL target",
+            "DLL target",
         )?;
     }
 
@@ -679,7 +790,7 @@ fn insert_unique(
     label: &str,
 ) -> Result<()> {
     if let Some(existing) = seen.insert(key.clone(), mod_name.to_owned()) {
-        bail!("native mods '{existing}' and '{mod_name}' collide on {label} '{key}'");
+        bail!("Mods '{existing}' and '{mod_name}' collide on {label} '{key}'");
     }
     Ok(())
 }

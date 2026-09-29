@@ -7,9 +7,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use cc::Build;
 use common::{
-    apply_common_defines, apply_common_msvc_flags, cc_archive_path, common_native_include_dirs,
-    define, emit_dylib_link, emit_rerun_for_tree, generate_abi_headers, require_paths_exist,
-    target_dir, version_defines, whole_archive_flag, workspace_root_from_manifest_dir,
+    apply_common_defines, apply_common_msvc_flags, cc_archive_path, define,
+    emit_core_import_library_link, emit_dylib_link, emit_rerun_for_tree, generate_abi_headers,
+    object_searcher_include_dir, platform_include_dirs, require_paths_exist, scanner_include_dir,
+    ue4ssl_sdk_include_dirs, version_defines, whole_archive_flag, workspace_root_from_manifest_dir,
     BuildProfile,
 };
 use serde::Deserialize;
@@ -71,11 +72,14 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     let source_label = format!("{} sources", input.mod_name);
     require_paths_exist(&source_label, source_files.iter());
 
-    let include_dirs = input
-        .include_dirs
-        .iter()
-        .map(PathBuf::from)
-        .collect::<Vec<_>>();
+    let generated = generate_abi_headers(&out_dir).context("failed to generate ABI headers")?;
+    let mut include_dirs = platform_include_dirs(&workspace_root);
+    include_dirs.extend(ue4ssl_sdk_include_dirs(&workspace_root, &generated));
+    include_dirs.extend([
+        scanner_include_dir(&workspace_root),
+        object_searcher_include_dir(&workspace_root),
+    ]);
+    include_dirs.extend(input.include_dirs.iter().map(PathBuf::from));
     let include_label = format!("{} include dirs", input.mod_name);
     require_paths_exist(&include_label, include_dirs.iter());
 
@@ -89,34 +93,17 @@ fn try_build_from_file(path: &Path) -> Result<()> {
     for include_dir in &include_dirs {
         emit_rerun_for_tree(include_dir);
     }
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/include"));
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/include"));
-    emit_rerun_for_tree(&workspace_root.join("crates/ue4ssl-dll/native/UE4SSL/generated_include"));
-    emit_rerun_for_tree(
-        &workspace_root.join("crates/ue4ssl-unreal-support/vendor/Unreal/generated_include"),
-    );
-
-    let generated = generate_abi_headers(&out_dir).context("failed to generate ABI headers")?;
     compile_archive(
         &input,
         &workspace_root,
         &source_files,
         &include_dirs,
-        &generated.ue4ssl_include,
-        &generated.unreal_include,
         profile,
     );
 
     emit_link_libraries(&input);
 
-    let import_lib = target_dir(&workspace_root, profile).join("UE4SSL.dll.lib");
-    if !import_lib.exists() {
-        bail!(
-            "expected UE4SSL import library at {}. Build the core artifact before native mods.",
-            import_lib.display()
-        );
-    }
-    println!("cargo:rustc-link-arg-cdylib={}", import_lib.display());
+    emit_core_import_library_link(&workspace_root, profile)?;
 
     let archive = cc_archive_path(&out_dir, &input.archive_stem);
     println!(
@@ -132,8 +119,6 @@ fn compile_archive(
     workspace_root: &Path,
     source_files: &[PathBuf],
     include_dirs: &[PathBuf],
-    generated_ue4ssl_include: &Path,
-    generated_unreal_include: &Path,
     profile: BuildProfile,
 ) {
     let mut build = Build::new();
@@ -143,13 +128,6 @@ fn compile_archive(
     build.warnings(false);
     build.flag("/wd4996");
 
-    for include in common_native_include_dirs(
-        workspace_root,
-        Some(generated_ue4ssl_include),
-        Some(generated_unreal_include),
-    ) {
-        build.include(include);
-    }
     for include in include_dirs {
         build.include(include);
     }

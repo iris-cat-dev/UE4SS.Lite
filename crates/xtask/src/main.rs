@@ -4,11 +4,10 @@ use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use native::{
-    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path,
-    built_native_mod_binary_path, built_native_mod_pdb_path, core_artifacts, default_artifacts,
-    discover_native_mods, package_profile_dir, package_stage_dir, runtime_artifacts,
-    select_native_mods, write_generated_mod_workspace, ArtifactSpec, CargoProfile, NativeModSpec,
-    PackageKind,
+    artifact_binary_path, artifact_import_lib_path, artifact_pdb_path, core_artifacts,
+    default_artifacts, discover_mods, package_profile_dir, package_stage_dir,
+    script_engine_artifacts, select_mods, write_generated_mod_workspace, ArtifactSpec,
+    CargoProfile, ModBackend, ModSpec, PackageKind,
 };
 use xshell::{cmd, Shell};
 
@@ -261,13 +260,20 @@ fn mods(command: ModsCommand) -> Result<()> {
     match command {
         ModsCommand::List => {
             let root = workspace_root()?;
-            for spec in discover_native_mods(&root)? {
-                println!(
-                    "{}\t{}\t{} sources",
-                    spec.mod_name,
-                    spec.package_name,
-                    spec.source_files.len()
-                );
+            for spec in discover_mods(&root)? {
+                match &spec.backend {
+                    ModBackend::Cargo => {
+                        println!("{}\tcargo\t{}", spec.mod_name, spec.package_name);
+                    }
+                    ModBackend::Generated(sources) => {
+                        println!(
+                            "{}\tgenerated-native\t{}\t{} sources",
+                            spec.mod_name,
+                            spec.package_name,
+                            sources.source_files.len()
+                        );
+                    }
+                }
             }
             Ok(())
         }
@@ -275,11 +281,26 @@ fn mods(command: ModsCommand) -> Result<()> {
 }
 
 fn build(profile: CargoProfile, target: Option<&str>, scope: BuildScope) -> Result<()> {
-    sync_abi()?;
-
     let root = workspace_root()?;
+    let discovered = if scope.core_only {
+        Vec::new()
+    } else {
+        discover_mods(&root)?
+    };
+    let selected = select_mods(&discovered, &scope.mod_names)?;
+    build_selected(&root, profile, target, &scope, &selected)
+}
+
+fn build_selected(
+    root: &Utf8Path,
+    profile: CargoProfile,
+    target: Option<&str>,
+    scope: &BuildScope,
+    selected: &[&ModSpec],
+) -> Result<()> {
+    ue4ssl_build::common::sync_abi_headers(root.as_std_path())?;
     let shell = Shell::new()?;
-    prepare_cargo_shell(&shell, &root);
+    prepare_cargo_shell(&shell, root);
 
     build_artifacts(&shell, profile, target, core_artifacts(), "core artifacts")?;
     if scope.core_only {
@@ -291,12 +312,12 @@ fn build(profile: CargoProfile, target: Option<&str>, scope: BuildScope) -> Resu
             &shell,
             profile,
             target,
-            runtime_artifacts(),
-            "runtime artifacts",
+            script_engine_artifacts(),
+            "script engines",
         )?;
     }
 
-    build_native_mods(&shell, &root, profile, target, &scope.mod_names)?;
+    build_mods(&shell, root, profile, target, selected)?;
     Ok(())
 }
 
@@ -320,30 +341,48 @@ fn build_artifacts(
     run_cargo_build(shell, profile, target, &package_args, label)
 }
 
-fn build_native_mods(
+fn build_mods(
     shell: &Shell,
     root: &Utf8Path,
     profile: CargoProfile,
     target: Option<&str>,
-    requested_names: &[String],
+    selected: &[&ModSpec],
 ) -> Result<()> {
-    let discovered = discover_native_mods(root)?;
-    let selected = select_native_mods(&discovered, requested_names)?;
-    if selected.is_empty() {
+    let mut cargo_packages = Vec::new();
+    let mut generated = Vec::new();
+    for spec in selected {
+        match &spec.backend {
+            ModBackend::Cargo => {
+                cargo_packages.push("-p".to_owned());
+                cargo_packages.push(spec.package_name.clone());
+            }
+            ModBackend::Generated(_) => generated.push(*spec),
+        }
+    }
+    if !cargo_packages.is_empty() {
+        run_cargo_build(shell, profile, target, &cargo_packages, "Cargo Mods")?;
+    }
+    if generated.is_empty() {
         return Ok(());
     }
 
-    let generated_workspace = write_generated_mod_workspace(root, profile, target, &selected)?;
+    let generated_workspace = write_generated_mod_workspace(root, profile, target, &generated)?;
     let mut package_args = vec![
         "--manifest-path".to_owned(),
         generated_workspace.join("Cargo.toml").to_string(),
     ];
-    for spec in selected {
+    for spec in generated {
         package_args.push("-p".to_owned());
         package_args.push(spec.package_name.clone());
     }
 
-    run_cargo_build(shell, profile, target, &package_args, "native mods")
+    run_cargo_build(
+        shell,
+        profile,
+        target,
+        &package_args,
+        "generated native Mods",
+    )
 }
 
 fn build_native_support(profile: CargoProfile, target: Option<&str>) -> Result<()> {
@@ -474,11 +513,17 @@ fn package_to_stage(
     no_build: bool,
     scope: BuildScope,
 ) -> Result<Utf8PathBuf> {
+    let root = workspace_root()?;
+    let discovered = if scope.core_only {
+        Vec::new()
+    } else {
+        discover_mods(&root)?
+    };
+    let selected_mods = select_mods(&discovered, &scope.mod_names)?;
     if !no_build {
-        build(profile, target, scope.clone())?;
+        build_selected(&root, profile, target, &scope, &selected_mods)?;
     }
 
-    let root = workspace_root()?;
     let stage_dir = package_stage_dir(&root, profile, target);
     if stage_dir.exists() {
         fs::remove_dir_all(stage_dir.as_std_path())
@@ -487,27 +532,20 @@ fn package_to_stage(
     fs::create_dir_all(stage_dir.as_std_path())
         .with_context(|| format!("failed to create package dir {}", stage_dir))?;
 
-    let discovered = discover_native_mods(&root)?;
-    let selected_mods = if scope.core_only {
-        Vec::new()
-    } else {
-        select_native_mods(&discovered, &scope.mod_names)?
-    };
-
     if scope.core_only {
         for artifact in core_artifacts() {
             stage_artifact(&root, &stage_dir, profile, target, artifact)?;
         }
     } else if scope.only_mods() {
         for spec in selected_mods {
-            stage_native_mod(&root, &stage_dir, profile, target, spec)?;
+            stage_mod(&root, &stage_dir, profile, target, spec)?;
         }
     } else {
-        for artifact in selected_artifacts(false) {
+        for artifact in default_artifacts() {
             stage_artifact(&root, &stage_dir, profile, target, artifact)?;
         }
         for spec in selected_mods {
-            stage_native_mod(&root, &stage_dir, profile, target, spec)?;
+            stage_mod(&root, &stage_dir, profile, target, spec)?;
         }
     }
 
@@ -562,39 +600,40 @@ fn stage_artifact(
             }
 
             write_enabled_marker(&mod_dir)?;
-
-            for extra_root in artifact.extra_stage_roots {
-                stage_extra_root(root, &mod_dir, extra_root)?;
-            }
         }
     }
 
     Ok(())
 }
 
-fn stage_native_mod(
+fn stage_mod(
     root: &Utf8Path,
     stage_dir: &Utf8Path,
     profile: CargoProfile,
     target: Option<&str>,
-    spec: &NativeModSpec,
+    spec: &ModSpec,
 ) -> Result<()> {
-    let cargo_binary = built_native_mod_binary_path(root, profile, target, spec);
+    let cargo_binary = artifact_binary_path(root, profile, target, &spec.cargo_target_stem);
     if !cargo_binary.exists() {
-        bail!("expected built native mod artifact at {}", cargo_binary);
+        bail!("expected built Mod artifact at {}", cargo_binary);
     }
 
     let mod_dir = stage_dir.join("mods").join(&spec.mod_name);
     copy_file(&cargo_binary, &mod_dir.join("main.dll"))?;
 
-    let pdb = built_native_mod_pdb_path(root, profile, target, spec);
+    let pdb = artifact_pdb_path(root, profile, target, &spec.cargo_target_stem);
     if pdb.exists() {
         copy_file(&pdb, &mod_dir.join("main.pdb"))?;
     }
 
     write_enabled_marker(&mod_dir)?;
-    for resource_root in &spec.resource_roots {
-        stage_resource_root(resource_root, &mod_dir)?;
+    for resource in &spec.resources {
+        let destination = mod_dir.join(&resource.destination);
+        if resource.source.is_dir() {
+            copy_tree(&resource.source, &destination)?;
+        } else {
+            copy_file(&resource.source, &destination)?;
+        }
     }
 
     Ok(())
@@ -609,14 +648,6 @@ fn write_enabled_marker(mod_dir: &Utf8Path) -> Result<()> {
             .with_context(|| format!("failed to write {}", enabled))?;
     }
     Ok(())
-}
-
-fn selected_artifacts(core_only: bool) -> Vec<&'static ArtifactSpec> {
-    if core_only {
-        core_artifacts().collect()
-    } else {
-        default_artifacts().collect()
-    }
 }
 
 fn prepare_cargo_shell(shell: &Shell, root: &Utf8Path) {
@@ -692,37 +723,6 @@ fn executable_in_path(name: &str) -> bool {
     };
 
     env::split_paths(&path).any(|dir| dir.join(name).is_file())
-}
-
-fn stage_extra_root(root: &Utf8Path, mod_dir: &Utf8Path, extra_root: &str) -> Result<()> {
-    let source = root.join(extra_root);
-    if !source.exists() {
-        bail!("expected extra stage root at {}", source);
-    }
-
-    let name = source
-        .file_name()
-        .context("extra stage root is missing file name")?;
-    let destination = mod_dir.join(name);
-
-    if source.is_dir() {
-        copy_tree(&source, &destination)?;
-    } else {
-        copy_file(&source, &destination)?;
-    }
-
-    Ok(())
-}
-
-fn stage_resource_root(source: &Utf8Path, mod_dir: &Utf8Path) -> Result<()> {
-    if source.is_dir() {
-        copy_tree_contents(source, mod_dir)
-    } else {
-        let name = source
-            .file_name()
-            .context("resource path is missing file name")?;
-        copy_file(source, &mod_dir.join(name))
-    }
 }
 
 fn copy_file(source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
