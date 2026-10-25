@@ -1,5 +1,7 @@
 # UE4SS 对象查找 API 参考
 
+> 当前 C++/JS 完整 API 文档入口：[API 总览](api/README.md)；本专题的详细参数、搜索上下文及 Hook/扫描接口见 [C++ 查找与 Hook](api/cpp/search-and-hooks.md)，JS 对应接口见 [JS 对象参考](api/javascript/objects.md)。
+
 本文对应实现文件：
 `crates/ue4ssl-object-searcher/include/Unreal/ObjectSearch/UObjectSearch.hpp`
 

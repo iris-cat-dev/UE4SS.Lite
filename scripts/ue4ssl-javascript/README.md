@@ -1,5 +1,7 @@
 # JSScriptMod - JavaScript Scripting for UE4SS
 
+> 当前实现的完整中文 API 参考已整理到 [docs/api/javascript](../../docs/api/javascript/README.md)，包含输入/输出参数、返回值与错误、线程约束和用法。下文保留为早期概览；部署名和接口行为以新参考及源码为准。
+
 JSScriptMod provides JavaScript scripting support for UE4SS using the QuickJS engine, similar to the built-in Lua scripting support.
 
 ## Features

@@ -8,6 +8,12 @@ UE4SS-Lite 是一个用于集成到 Unreal Engine 游戏中的友好、高性能
 - 构建脚本引擎 Mod：`UE4SSL.JavaScript` 和 `UE4SSL.Lua`。
 - 通过 `xtask` 提供 build、package、install、proxy 生成和 ABI 头同步命令。
 
+## API 文档
+
+- [API 总览](docs/api/README.md)
+- [C++ API](docs/api/cpp/README.md)：生命周期、输入输出参数、Unreal 反射、对象查找、Hook、输入、日志与示例。
+- [JavaScript API](docs/api/javascript/README.md)：部署、对象/属性、Hook/委托、定时器、文件/网络/音频与示例。
+
 ## 环境要求
 
 - Windows。
@@ -188,6 +194,7 @@ target/package/<debug|release>/proxy/
 - 修改 native include、vendor 源码或 ABI 生成逻辑后，运行 `cargo check -p ue4ssl-dll`。
 - 修改 support crate 链接行为后，运行 `cargo build -p ue4ssl-dll` 验证 `/WHOLEARCHIVE` 链接路径。
 - 修改脚本引擎或 Mod include 路径后，运行 `cargo ue4ssl-build --profile dev` 覆盖完整运行时构建。
+- 使用 Unreal SDK 公共头的原生 crate 通过 `unreal_sdk_include_dirs` 同时获得生成的 UE4SSL 和 Unreal ABI include 根目录。
 - Unreal vendor 树已经不是子模块。对 `crates/ue4ssl-unreal-support/vendor/Unreal` 的更新按普通源码变更处理。
 
 ## Credits

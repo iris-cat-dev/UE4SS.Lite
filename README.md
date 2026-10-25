@@ -9,6 +9,12 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 - Provides `xtask` commands for build, package, install, proxy generation, and ABI header synchronization.
 - Native detours preserve general-purpose registers, reject patch windows that cross a terminal instruction, and encode the trampoline resume branch before any far-branch pointer pool.
 
+## API Documentation
+
+- [API overview (中文)](docs/api/README.md)
+- [C++ API](docs/api/cpp/README.md): lifecycle, parameters and return values, Unreal reflection, object search, hooks, input, logging, and examples.
+- [JavaScript API](docs/api/javascript/README.md): deployment, objects, properties, hooks, delegates, timers, file/network/audio services, and examples.
+
 ## Requirements
 
 - Windows.
