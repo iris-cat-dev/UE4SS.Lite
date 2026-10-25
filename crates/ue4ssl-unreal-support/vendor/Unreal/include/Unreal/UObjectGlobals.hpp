@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 #include <functional>
+#include <memory>
 
 #include <Function/Function.hpp>
 #include <Constructs/Loop.hpp>
@@ -190,8 +191,16 @@ namespace RC::Unreal::UObjectGlobals
 
     // Custom Helpers -> START
     // Register a UFunction hook through all known means.
+    //
+    // RegisterHookOwned keeps CustomData alive until no callback can still use it.
+    // Raw CustomData passed to RegisterHook remains caller-owned. Unregistration from
+    // inside any global script callback does not wait for other callbacks, so callers
+    // with owned state should use RegisterHookOwned.
     RC_UE_API auto RegisterHook(class UFunction* Function, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, void*) -> std::pair<int, int>;
     RC_UE_API auto RegisterHook(const StringType& FunctionFullNameNoType, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, void*) -> std::pair<int, int>;
+    RC_UE_API auto RegisterHookOwned(class UFunction* Function, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, std::shared_ptr<void>) -> std::pair<int, int>;
+    RC_UE_API auto RegisterHookOwned(const StringType& FunctionFullNameNoType, UnrealScriptFunctionCallable, UnrealScriptFunctionCallable, std::shared_ptr<void>) -> std::pair<int, int>;
+    RC_UE_API auto UnregisterHook(std::pair<int, int>) -> bool;
     RC_UE_API auto UnregisterHook(class UFunction* Function, std::pair<int, int>) -> void;
     RC_UE_API auto UnregisterHook(const StringType& FunctionFullNameNoType, std::pair<int, int>) -> void;
     // Custom Helpers -> END

@@ -48,6 +48,37 @@ namespace RC::JSScript
         }
 
     }
+    JSMod::JSUFunctionHookData::~JSUFunctionHookData()
+    {
+        if (!ctx)
+        {
+            return;
+        }
+
+        auto ReleaseCallbacks = [this] {
+            if (!JS_IsUndefined(pre_callback))
+            {
+                JS_FreeValue(ctx, pre_callback);
+                pre_callback = JS_UNDEFINED;
+            }
+            if (!JS_IsUndefined(post_callback))
+            {
+                JS_FreeValue(ctx, post_callback);
+                post_callback = JS_UNDEFINED;
+            }
+            ctx = nullptr;
+        };
+
+        if (owner)
+        {
+            std::lock_guard<std::recursive_mutex> lock(owner->m_js_mutex);
+            ReleaseCallbacks();
+        }
+        else
+        {
+            ReleaseCallbacks();
+        }
+    }
 
     // ============================================
     // SEH helpers for hook system
@@ -171,16 +202,15 @@ namespace RC::JSScript
         }
     }
 
-    static bool safe_engine_unregister_hook(Unreal::UFunction* function, Unreal::CallbackId pre_id, Unreal::CallbackId post_id)
+    static bool safe_engine_unregister_hook(Unreal::CallbackId pre_id, Unreal::CallbackId post_id)
     {
         __try
         {
-            Unreal::UObjectGlobals::UnregisterHook(function, {pre_id, post_id});
-            return true;
+            return Unreal::UObjectGlobals::UnregisterHook({pre_id, post_id});
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
-            Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] UnregisterHook: UFunction pointer is stale, skipping engine unregister\n"));
+            Output::send<LogLevel::Warning>(STR("[UE4SSL.JavaScript] UnregisterHook: engine hook data is stale, keeping callback ownership\n"));
             return false;
         }
     }
@@ -792,7 +822,8 @@ namespace RC::JSScript
         bool is_pre)
     {
         JSMod::PendingHookCallback pending;
-        pending.hook_data = hook_data;
+        pending.hook_owner = hook_data->shared_from_this();
+        pending.hook_data = pending.hook_owner.get();
         pending.is_pre = is_pre;
         pending.context_object = context_object;
         for (auto& [prop, data] : params)
@@ -1675,7 +1706,7 @@ namespace RC::JSScript
             return {0, 0};
         }
 
-        auto hook_data = std::make_unique<JSUFunctionHookData>();
+        auto hook_data = std::make_shared<JSUFunctionHookData>();
         hook_data->owner = this;
         hook_data->ctx = ctx;
         hook_data->function = function;
@@ -1693,23 +1724,26 @@ namespace RC::JSScript
             hook_data->post_callback = JS_DupValue(ctx, post_callback);
         else
             hook_data->post_callback = JS_UNDEFINED;
-
-        JSUFunctionHookData* raw_hook_data = hook_data.get();
-
         {
             std::lock_guard<std::mutex> lock(m_ufunction_hooks_mutex);
-            m_ufunction_hooks.push_back(std::move(hook_data));
+            m_ufunction_hooks.push_back(hook_data);
         }
 
-        auto [generic_pre_id, generic_post_id] = Unreal::UObjectGlobals::RegisterHook(
+        auto [generic_pre_id, generic_post_id] = Unreal::UObjectGlobals::RegisterHookOwned(
             function,
             js_ufunction_hook_pre,
             js_ufunction_hook_post,
-            raw_hook_data
+            hook_data
         );
+        if (generic_pre_id < 0 || generic_post_id < 0)
+        {
+            std::lock_guard<std::mutex> lock(m_ufunction_hooks_mutex);
+            std::erase(m_ufunction_hooks, hook_data);
+            return {generic_pre_id, generic_post_id};
+        }
 
-        raw_hook_data->pre_id = generic_pre_id;
-        raw_hook_data->post_id = generic_post_id;
+        hook_data->pre_id = generic_pre_id;
+        hook_data->post_id = generic_post_id;
 
         Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered hook (pre_id={}, post_id={}, sync={}) for {}\n"),
             generic_pre_id, generic_post_id, force_sync ? STR("true") : STR("false"), function->GetFullName());
@@ -1726,28 +1760,33 @@ namespace RC::JSScript
         }
 
         hook_data->owner = this;
-        NativeObjectMethodHookData* raw_hook_data = hook_data.get();
-
+        auto SharedHookData = std::shared_ptr<NativeObjectMethodHookData>{std::move(hook_data)};
         {
             std::lock_guard<std::mutex> lock(m_native_method_hooks_mutex);
-            m_native_method_hooks.push_back(std::move(hook_data));
+            m_native_method_hooks.push_back(SharedHookData);
         }
 
-        auto [generic_pre_id, generic_post_id] = Unreal::UObjectGlobals::RegisterHook(
-            raw_hook_data->hook_function,
+        auto [generic_pre_id, generic_post_id] = Unreal::UObjectGlobals::RegisterHookOwned(
+            SharedHookData->hook_function,
             native_object_method_hook_pre,
             native_object_method_hook_post,
-            raw_hook_data
+            SharedHookData
         );
+        if (generic_pre_id < 0 || generic_post_id < 0)
+        {
+            std::lock_guard<std::mutex> lock(m_native_method_hooks_mutex);
+            std::erase(m_native_method_hooks, SharedHookData);
+            return {generic_pre_id, generic_post_id};
+        }
 
-        raw_hook_data->pre_id = generic_pre_id;
-        raw_hook_data->post_id = generic_post_id;
+        SharedHookData->pre_id = generic_pre_id;
+        SharedHookData->post_id = generic_post_id;
 
         Output::send<LogLevel::Normal>(STR("[UE4SSL.JavaScript] Registered native object method hook (pre_id={}, post_id={}) for {} -> {}\n"),
             generic_pre_id,
             generic_post_id,
-            raw_hook_data->hook_function->GetFullName(),
-            raw_hook_data->method_name);
+            SharedHookData->hook_function->GetFullName(),
+            SharedHookData->method_name);
 
         return {generic_pre_id, generic_post_id};
     }
@@ -1765,35 +1804,19 @@ namespace RC::JSScript
                     JSUFunctionHookData* raw_ptr = hook.get();
 
                     {
-                        std::lock_guard<std::mutex> plock(m_pending_hook_callbacks_mutex);
+                        std::lock_guard<std::mutex> pending_lock(m_pending_hook_callbacks_mutex);
                         m_pending_hook_callbacks.erase(
                             std::remove_if(m_pending_hook_callbacks.begin(), m_pending_hook_callbacks.end(),
-                                [raw_ptr](const PendingHookCallback& p) { return p.hook_data == raw_ptr; }),
+                                [raw_ptr](const PendingHookCallback& pending) { return pending.hook_data == raw_ptr; }),
                             m_pending_hook_callbacks.end());
                     }
 
-                    if (hook->ctx)
+                    if (!safe_engine_unregister_hook(hook->pre_id, hook->post_id))
                     {
-                        if (!JS_IsUndefined(hook->pre_callback))
-                        {
-                            JS_FreeValue(hook->ctx, hook->pre_callback);
-                            hook->pre_callback = JS_UNDEFINED;
-                        }
-                        if (!JS_IsUndefined(hook->post_callback))
-                        {
-                            JS_FreeValue(hook->ctx, hook->post_callback);
-                            hook->post_callback = JS_UNDEFINED;
-                        }
+                        return false;
                     }
-
-                    if (hook->function)
-                    {
-                        (void)safe_engine_unregister_hook(hook->function, hook->pre_id, hook->post_id);
-                        hook->function = nullptr;
-                    }
-
+                    hook->function = nullptr;
                     m_ufunction_hooks.erase(it);
-
                     return true;
                 }
             }
@@ -1806,12 +1829,11 @@ namespace RC::JSScript
                 auto& hook = *it;
                 if (hook && (hook->pre_id == pre_id || hook->post_id == post_id))
                 {
-                    if (hook->hook_function)
+                    if (!safe_engine_unregister_hook(hook->pre_id, hook->post_id))
                     {
-                        (void)safe_engine_unregister_hook(hook->hook_function, hook->pre_id, hook->post_id);
-                        hook->hook_function = nullptr;
+                        return false;
                     }
-
+                    hook->hook_function = nullptr;
                     m_native_method_hooks.erase(it);
                     return true;
                 }

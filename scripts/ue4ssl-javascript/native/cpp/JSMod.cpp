@@ -101,24 +101,22 @@ namespace RC::JSScript
         }
     }
 
-    static auto safe_stop_unregister_ufunction_hook(Unreal::UFunction* function,
-                                                    Unreal::CallbackId pre_id,
+    static auto safe_stop_unregister_ufunction_hook(Unreal::CallbackId pre_id,
                                                     Unreal::CallbackId post_id) -> bool
     {
-        if (!function || (pre_id == 0 && post_id == 0))
+        if (pre_id == 0 && post_id == 0)
         {
             return false;
         }
 
         __try
         {
-            Unreal::UObjectGlobals::UnregisterHook(function, {pre_id, post_id});
-            return true;
+            return Unreal::UObjectGlobals::UnregisterHook({pre_id, post_id});
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
             Output::send<LogLevel::Warning>(
-                STR("[UE4SSL.JavaScript] stop(): UFunction pointer is stale during unregister, skipping engine unregister\n"));
+                STR("[UE4SSL.JavaScript] stop(): engine hook data is stale, disarming callback ownership\n"));
             return false;
         }
     }
@@ -325,12 +323,9 @@ namespace RC::JSScript
                     continue;
                 }
 
-                if (hook->function)
-                {
-                    (void)safe_stop_unregister_ufunction_hook(hook->function, hook->pre_id, hook->post_id);
-                    hook->function = nullptr;
-                }
-
+                (void)safe_stop_unregister_ufunction_hook(hook->pre_id, hook->post_id);
+                // Disabled dispatch snapshots may still own the hook record after
+                // unregister returns. Disarm QuickJS state before this JSMod can die.
                 if (hook->ctx)
                 {
                     if (!JS_IsUndefined(hook->pre_callback))
@@ -338,6 +333,11 @@ namespace RC::JSScript
                     if (!JS_IsUndefined(hook->post_callback))
                         JS_FreeValue(hook->ctx, hook->post_callback);
                 }
+                hook->pre_callback = JS_UNDEFINED;
+                hook->post_callback = JS_UNDEFINED;
+                hook->ctx = nullptr;
+                hook->owner = nullptr;
+                hook->function = nullptr;
             }
             m_ufunction_hooks.clear();
         }
@@ -350,7 +350,9 @@ namespace RC::JSScript
                 {
                     continue;
                 }
-                safe_stop_unregister_ufunction_hook(hook->hook_function, hook->pre_id, hook->post_id);
+                (void)safe_stop_unregister_ufunction_hook(hook->pre_id, hook->post_id);
+                hook->owner = nullptr;
+                hook->hook_function = nullptr;
             }
             m_native_method_hooks.clear();
         }

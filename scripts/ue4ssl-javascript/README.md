@@ -129,6 +129,8 @@ Unregister a previously registered hook.
 
 **Returns:** Boolean indicating success
 
+`UnregisterHook` may be called from a hook callback, including to unregister the callback currently running. The current callback finishes with its data still valid; subsequent callbacks for that registration are skipped. Hooks registered from a callback begin on the next function invocation.
+
 ```javascript
 // Later, unregister the hook
 var success = UnregisterHook(hookIds[0], hookIds[1]);

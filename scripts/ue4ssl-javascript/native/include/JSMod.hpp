@@ -61,7 +61,7 @@ namespace RC::JSScript
         };
 
         // JavaScript UFunction Hook data
-        struct JSUFunctionHookData
+        struct JSUFunctionHookData : std::enable_shared_from_this<JSUFunctionHookData>
         {
             JSMod* owner;                      // Pointer to JSMod instance
             JSContext* ctx;                    // JS context
@@ -73,6 +73,8 @@ namespace RC::JSScript
             bool has_return_value;             // Does the function have a return value
             bool is_executing{false};          // Recursion guard - prevents re-entry during hook execution
             bool force_sync{false};             // Execute callback in the UE hook callstack instead of deferring to JS tick.
+
+            ~JSUFunctionHookData();
         };
 
         struct JSBindHookData
@@ -175,10 +177,10 @@ namespace RC::JSScript
             void* data_ref{nullptr};
         };
 
-        // A hook callback queued from the game thread for deferred execution on the event loop thread
         struct PendingHookCallback
         {
-            JSUFunctionHookData* hook_data;       // Pointer to hook data (owns JS callback refs)
+            JSUFunctionHookData* hook_data;       // Pointer to hook data, or tagged ProcessEvent watch index
+            std::shared_ptr<JSUFunctionHookData> hook_owner{}; // Keeps deferred UFunction hook data alive
             bool is_pre;                           // true = pre-callback, false = post-callback
             Unreal::UObject* context_object;       // 'this' UObject
             std::vector<PendingHookCallbackParam> params;
@@ -233,9 +235,9 @@ namespace RC::JSScript
         Unreal::Hook::GlobalCallbackId m_load_map_post_callback_id{Unreal::Hook::ERROR_ID};
 
         // UFunction hook management (public for access from global functions)
-        std::vector<std::unique_ptr<JSUFunctionHookData>> m_ufunction_hooks;
+        std::vector<std::shared_ptr<JSUFunctionHookData>> m_ufunction_hooks;
         std::mutex m_ufunction_hooks_mutex;
-        std::vector<std::unique_ptr<NativeObjectMethodHookData>> m_native_method_hooks;
+        std::vector<std::shared_ptr<NativeObjectMethodHookData>> m_native_method_hooks;
         std::mutex m_native_method_hooks_mutex;
 
         // Legacy hook management (public for access from global functions)

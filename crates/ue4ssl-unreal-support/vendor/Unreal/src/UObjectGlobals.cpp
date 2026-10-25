@@ -13,6 +13,7 @@
 #include <Unreal/UnrealInitializer.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <atomic>
+#include <condition_variable>
 #include <chrono>
 #include <format>
 #include <excpt.h>
@@ -338,94 +339,284 @@ namespace RC::Unreal::UObjectGlobals
 
     struct GlobalHooksInternal
     {
+        struct InternalData
+        {
+            UnrealScriptFunctionCallable CallablePre{};
+            UnrealScriptFunctionCallable CallablePost{};
+            void* CustomData{};
+            int32_t PreId{};
+            int32_t PostId{};
+
+        private:
+            std::mutex StateMutex{};
+            std::condition_variable IdleCondition{};
+            size_t ActiveInvocations{};
+            bool Registered{true};
+
+        public:
+            InternalData(UnrealScriptFunctionCallable PreCallable,
+                         UnrealScriptFunctionCallable PostCallable,
+                         void* InCustomData,
+                         int32_t InPreId,
+                         int32_t InPostId) :
+                CallablePre(std::move(PreCallable)),
+                CallablePost(std::move(PostCallable)),
+                CustomData(InCustomData),
+                PreId(InPreId),
+                PostId(InPostId)
+            {
+            }
+
+            auto BeginInvocation() -> bool
+            {
+                std::lock_guard lock(StateMutex);
+                if (!Registered)
+                {
+                    return false;
+                }
+                ++ActiveInvocations;
+                return true;
+            }
+
+            auto EndInvocation() -> void
+            {
+                std::lock_guard lock(StateMutex);
+                if (--ActiveInvocations == 0)
+                {
+                    IdleCondition.notify_all();
+                }
+            }
+
+            auto Disable() -> void
+            {
+                std::lock_guard lock(StateMutex);
+                Registered = false;
+            }
+
+            auto WaitUntilIdle() -> void
+            {
+                std::unique_lock lock(StateMutex);
+                IdleCondition.wait(lock, [this] {
+                    return ActiveInvocations == 0;
+                });
+            }
+        };
+
+        using Registration = std::shared_ptr<InternalData>;
+        using CallbackList = std::vector<Registration>;
+        using CallbackSnapshot = std::shared_ptr<const CallbackList>;
+
         struct CallableData
         {
-            struct InternalData
-            {
-                UnrealScriptFunctionCallable CallablePre{};
-                UnrealScriptFunctionCallable CallablePost{};
-                void* CustomData{};
-                int32_t PreId{};
-                int32_t PostId{};
-
-                InternalData() = default;
-                InternalData(UnrealScriptFunctionCallable PreCallable, UnrealScriptFunctionCallable PostCallable, void* CustomData, int32_t PreId, int32_t PostId) :
-                      CallablePre(PreCallable),
-                      CallablePost(PostCallable),
-                      CustomData(CustomData),
-                      PreId(PreId),
-                      PostId(PostId) {}
-            };
-            std::vector<InternalData> Callables{};
+            CallbackSnapshot Callables{};
             uint64 ShortName{};
         };
+
+        struct NativeCallbackData
+        {
+            UFunction* Function{};
+            int32_t NativeId{};
+        };
+
         static inline std::unordered_map<StringType, CallableData> GlobalScriptHooks{};
         // Count full-name entries, not callbacks; full names remain the authoritative keys.
         static inline std::unordered_map<uint64, size_t> HookedShortNames{};
+        static inline std::unordered_map<int32_t, StringType> GenericScriptHookIdToFunctionName{};
+        static inline std::unordered_map<int32_t, NativeCallbackData> GenericHookIdToNativeHook{};
         static inline std::atomic<bool> bAnyScriptHook{};
         static inline std::shared_mutex GlobalScriptHooksMutex{};
         static inline bool bIsHookEnabled{};
         static inline int32_t LastGenericHookId{};
-        static inline std::unordered_map<int32_t, int32_t> GenericHookIdToNativeHookId{};
+        static inline thread_local size_t ScriptHookInvocationDepth{};
     };
 
-    static auto GlobalScriptHookPre([[maybe_unused]]Hook::TCallbackIterationData<void>& CallbackIterationData, [[maybe_unused]]Unreal::UObject* Context, Unreal::FFrame& Stack, [[maybe_unused]]void* RESULT_DECL) -> void
+    class GlobalScriptHookInvocationScope
     {
-        if (!GlobalHooksInternal::bAnyScriptHook.load(std::memory_order_acquire)) { return; }
-        auto* Node = Stack.Node();
-        if (!Node) { return; }
-        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-        if (!GlobalHooksInternal::HookedShortNames.contains(Node->GetFName().ToUnstableInt())) { return; }
-        auto function_name = Node->GetFullName();
-        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(function_name); it != GlobalHooksInternal::GlobalScriptHooks.end())
+    private:
+        GlobalHooksInternal::Registration m_Registration{};
+        bool m_Active{};
+
+    public:
+        explicit GlobalScriptHookInvocationScope(GlobalHooksInternal::Registration Registration) :
+            m_Registration(std::move(Registration))
         {
-            UnrealScriptFunctionCallableContext CallableContext{Context, Stack, RESULT_DECL};
-            for (const auto& Callable : it->second.Callables)
+            if (m_Registration && m_Registration->BeginInvocation())
             {
-                invoke_global_script_callable(
-                    &Callable.CallablePre,
-                    &CallableContext,
-                    Callable.CustomData,
-                    &function_name,
-                    "pre",
-                    Callable.PreId,
-                    Callable.PostId);
+                ++GlobalHooksInternal::ScriptHookInvocationDepth;
+                m_Active = true;
             }
+        }
+
+        ~GlobalScriptHookInvocationScope()
+        {
+            if (m_Active)
+            {
+                --GlobalHooksInternal::ScriptHookInvocationDepth;
+                m_Registration->EndInvocation();
+            }
+        }
+
+        GlobalScriptHookInvocationScope(const GlobalScriptHookInvocationScope&) = delete;
+        auto operator=(const GlobalScriptHookInvocationScope&) -> GlobalScriptHookInvocationScope& = delete;
+
+        explicit operator bool() const
+        {
+            return m_Active;
+        }
+    };
+
+    static auto FindGlobalScriptHookSnapshot(FFrame& Stack, StringType& FunctionName) -> GlobalHooksInternal::CallbackSnapshot
+    {
+        if (!GlobalHooksInternal::bAnyScriptHook.load(std::memory_order_acquire))
+        {
+            return {};
+        }
+        auto* Node = Stack.Node();
+        if (!Node)
+        {
+            return {};
+        }
+
+        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+        if (!GlobalHooksInternal::HookedShortNames.contains(Node->GetFName().ToUnstableInt()))
+        {
+            return {};
+        }
+
+        FunctionName = Node->GetFullName();
+        if (auto It = GlobalHooksInternal::GlobalScriptHooks.find(FunctionName);
+            It != GlobalHooksInternal::GlobalScriptHooks.end())
+        {
+            return It->second.Callables;
+        }
+        return {};
+    }
+
+    static auto RunGlobalScriptHooks(UObject* Context, FFrame& Stack, void* RESULT_DECL, bool IsPre) -> void
+    {
+        StringType FunctionName{};
+        auto Callbacks = FindGlobalScriptHookSnapshot(Stack, FunctionName);
+        if (!Callbacks)
+        {
+            return;
+        }
+
+        UnrealScriptFunctionCallableContext CallableContext{Context, Stack, RESULT_DECL};
+        for (const auto& Callable : *Callbacks)
+        {
+            const auto* Function = IsPre ? &Callable->CallablePre : &Callable->CallablePost;
+            if (!*Function)
+            {
+                continue;
+            }
+
+            GlobalScriptHookInvocationScope Invocation{Callable};
+            if (!Invocation)
+            {
+                continue;
+            }
+
+            invoke_global_script_callable(
+                Function,
+                &CallableContext,
+                Callable->CustomData,
+                &FunctionName,
+                IsPre ? "pre" : "post",
+                Callable->PreId,
+                Callable->PostId);
         }
     }
 
-    static auto GlobalScriptHookPost([[maybe_unused]]Hook::TCallbackIterationData<void>& CallbackIterationData, [[maybe_unused]]Unreal::UObject* Context, Unreal::FFrame& Stack, [[maybe_unused]]void* RESULT_DECL) -> void
+    static auto GlobalScriptHookPre([[maybe_unused]] Hook::TCallbackIterationData<void>& CallbackIterationData,
+                                    Unreal::UObject* Context,
+                                    Unreal::FFrame& Stack,
+                                    void* RESULT_DECL) -> void
     {
-        if (!GlobalHooksInternal::bAnyScriptHook.load(std::memory_order_acquire)) { return; }
-        auto* Node = Stack.Node();
-        if (!Node) { return; }
-        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-        if (!GlobalHooksInternal::HookedShortNames.contains(Node->GetFName().ToUnstableInt())) { return; }
-        auto function_name = Node->GetFullName();
-        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(function_name); it != GlobalHooksInternal::GlobalScriptHooks.end())
-        {
-            UnrealScriptFunctionCallableContext CallableContext{Context, Stack, RESULT_DECL};
-            for (const auto& Callable : it->second.Callables)
-            {
-                invoke_global_script_callable(
-                    &Callable.CallablePost,
-                    &CallableContext,
-                    Callable.CustomData,
-                    &function_name,
-                    "post",
-                    Callable.PreId,
-                    Callable.PostId);
-            }
-        }
+        RunGlobalScriptHooks(Context, Stack, RESULT_DECL, true);
     }
 
-    auto RegisterHook(UFunction* Function, UnrealScriptFunctionCallable PreCallback, UnrealScriptFunctionCallable PostCallback, void* CustomData) -> std::pair<int, int>
+    static auto GlobalScriptHookPost([[maybe_unused]] Hook::TCallbackIterationData<void>& CallbackIterationData,
+                                     Unreal::UObject* Context,
+                                     Unreal::FFrame& Stack,
+                                     void* RESULT_DECL) -> void
+    {
+        RunGlobalScriptHooks(Context, Stack, RESULT_DECL, false);
+    }
+
+    static auto RemoveGlobalScriptHook(const StringType& FunctionName, std::pair<int, int> Ids) -> bool
+    {
+        GlobalHooksInternal::Registration Removed{};
+        {
+            std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+            auto CallbackDataIt = GlobalHooksInternal::GlobalScriptHooks.find(FunctionName);
+            if (CallbackDataIt == GlobalHooksInternal::GlobalScriptHooks.end() || !CallbackDataIt->second.Callables)
+            {
+                return false;
+            }
+
+            const auto& CurrentCallbacks = *CallbackDataIt->second.Callables;
+            auto Match = std::find_if(CurrentCallbacks.begin(), CurrentCallbacks.end(), [&](const auto& CallbackData) {
+                return Ids.first == CallbackData->PreId && Ids.second == CallbackData->PostId;
+            });
+            if (Match == CurrentCallbacks.end())
+            {
+                return false;
+            }
+
+            Removed = *Match;
+            Removed->Disable();
+            GlobalHooksInternal::GenericScriptHookIdToFunctionName.erase(Removed->PreId);
+            GlobalHooksInternal::GenericScriptHookIdToFunctionName.erase(Removed->PostId);
+
+            if (CurrentCallbacks.size() == 1)
+            {
+                if (auto ShortNameIt = GlobalHooksInternal::HookedShortNames.find(CallbackDataIt->second.ShortName);
+                    ShortNameIt != GlobalHooksInternal::HookedShortNames.end() && --ShortNameIt->second == 0)
+                {
+                    GlobalHooksInternal::HookedShortNames.erase(ShortNameIt);
+                }
+                GlobalHooksInternal::GlobalScriptHooks.erase(CallbackDataIt);
+            }
+            else
+            {
+                auto UpdatedCallbacks = std::make_shared<GlobalHooksInternal::CallbackList>();
+                UpdatedCallbacks->reserve(CurrentCallbacks.size() - 1);
+                for (const auto& CallbackData : CurrentCallbacks)
+                {
+                    if (CallbackData != Removed)
+                    {
+                        UpdatedCallbacks->push_back(CallbackData);
+                    }
+                }
+                CallbackDataIt->second.Callables = std::move(UpdatedCallbacks);
+            }
+
+            GlobalHooksInternal::bAnyScriptHook.store(
+                !GlobalHooksInternal::GlobalScriptHooks.empty(),
+                std::memory_order_release);
+        }
+
+        // Waiting here preserves the existing external-unregister guarantee. Waiting
+        // from a callback can deadlock with another callback doing the inverse removal;
+        // owned registrations keep CustomData alive until their final invocation exits.
+        if (GlobalHooksInternal::ScriptHookInvocationDepth == 0)
+        {
+            Removed->WaitUntilIdle();
+        }
+        return true;
+    }
+
+    auto RegisterHook(UFunction* Function,
+                      UnrealScriptFunctionCallable PreCallback,
+                      UnrealScriptFunctionCallable PostCallback,
+                      void* CustomData) -> std::pair<int, int>
     {
         if (!Function)
         {
             Output::send<LogLevel::Error>(STR("RegisterHook failed: UFunction is nullptr\n"));
             return {-1, -1};
         }
+
         auto NativeFunction = Function->GetFunc();
         if (NativeFunction &&
             NativeFunction != UObject::ProcessInternalInternal.get_function_address() &&
@@ -433,19 +624,29 @@ namespace RC::Unreal::UObjectGlobals
         {
             auto PreId = Function->RegisterPreHook(PreCallback, CustomData);
             auto PostId = Function->RegisterPostHook(PostCallback, CustomData);
-            GlobalHooksInternal::GenericHookIdToNativeHookId.emplace(++GlobalHooksInternal::LastGenericHookId, PreId);
-            auto GenericPreId = GlobalHooksInternal::LastGenericHookId;
-            GlobalHooksInternal::GenericHookIdToNativeHookId.emplace(++GlobalHooksInternal::LastGenericHookId, PostId);
-            auto GenericPostId = GlobalHooksInternal::LastGenericHookId;
+
+            std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+            auto GenericPreId = ++GlobalHooksInternal::LastGenericHookId;
+            auto GenericPostId = ++GlobalHooksInternal::LastGenericHookId;
+            GlobalHooksInternal::GenericHookIdToNativeHook.emplace(
+                GenericPreId,
+                GlobalHooksInternal::NativeCallbackData{Function, PreId});
+            GlobalHooksInternal::GenericHookIdToNativeHook.emplace(
+                GenericPostId,
+                GlobalHooksInternal::NativeCallbackData{Function, PostId});
             return {GenericPreId, GenericPostId};
         }
         else if (NativeFunction &&
                  NativeFunction == UObject::ProcessInternalInternal.get_function_address() &&
                  !Function->HasAnyFunctionFlags(EFunctionFlags::FUNC_Native))
         {
+            auto FunctionName = Function->GetFullName();
+            auto ShortName = Function->GetFName().ToUnstableInt();
+
+            std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
             if (!GlobalHooksInternal::bIsHookEnabled)
             {
-                const Hook::FCallbackOptions GlobalScriptHookOptions {false, false, STR("UE4SS"), STR("GlobalScriptHook")};
+                const Hook::FCallbackOptions GlobalScriptHookOptions{false, false, STR("UE4SS"), STR("GlobalScriptHook")};
                 if (UObject::ProcessLocalScriptFunctionInternal.is_ready() && Version::IsAtLeast(4, 22))
                 {
                     Hook::RegisterProcessLocalScriptFunctionPreCallback(GlobalScriptHookPre, GlobalScriptHookOptions);
@@ -458,20 +659,34 @@ namespace RC::Unreal::UObjectGlobals
                 }
                 GlobalHooksInternal::bIsHookEnabled = true;
             }
-            ++GlobalHooksInternal::LastGenericHookId;
-            auto GenericPreId = GlobalHooksInternal::LastGenericHookId;
-            auto GenericPostId = GlobalHooksInternal::LastGenericHookId;
+
+            auto GenericPreId = ++GlobalHooksInternal::LastGenericHookId;
+            auto GenericPostId = GenericPreId;
+            auto Registration = std::make_shared<GlobalHooksInternal::InternalData>(
+                std::move(PreCallback),
+                std::move(PostCallback),
+                CustomData,
+                GenericPreId,
+                GenericPostId);
+
+            auto [Data, Inserted] = GlobalHooksInternal::GlobalScriptHooks.emplace(
+                FunctionName,
+                GlobalHooksInternal::CallableData{});
+            if (Inserted)
             {
-                std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-                auto [Data, Inserted] = GlobalHooksInternal::GlobalScriptHooks.emplace(Function->GetFullName(), GlobalHooksInternal::CallableData{});
-                if (Inserted)
-                {
-                    Data->second.ShortName = Function->GetFName().ToUnstableInt();
-                    ++GlobalHooksInternal::HookedShortNames[Data->second.ShortName];
-                }
-                Data->second.Callables.emplace_back(PreCallback, PostCallback, CustomData, GenericPreId, GenericPostId);
-                GlobalHooksInternal::bAnyScriptHook.store(true, std::memory_order_release);
+                Data->second.ShortName = ShortName;
+                ++GlobalHooksInternal::HookedShortNames[ShortName];
             }
+
+            auto UpdatedCallbacks = std::make_shared<GlobalHooksInternal::CallbackList>();
+            if (Data->second.Callables)
+            {
+                *UpdatedCallbacks = *Data->second.Callables;
+            }
+            UpdatedCallbacks->push_back(std::move(Registration));
+            Data->second.Callables = std::move(UpdatedCallbacks);
+            GlobalHooksInternal::GenericScriptHookIdToFunctionName.emplace(GenericPreId, FunctionName);
+            GlobalHooksInternal::bAnyScriptHook.store(true, std::memory_order_release);
             return {GenericPreId, GenericPostId};
         }
         else
@@ -484,7 +699,10 @@ namespace RC::Unreal::UObjectGlobals
         }
     }
 
-    auto RegisterHook(const StringType& FunctionFullNameNoType, UnrealScriptFunctionCallable PreCallback, UnrealScriptFunctionCallable PostCallback, void* CustomData) -> std::pair<int, int>
+    auto RegisterHook(const StringType& FunctionFullNameNoType,
+                      UnrealScriptFunctionCallable PreCallback,
+                      UnrealScriptFunctionCallable PostCallback,
+                      void* CustomData) -> std::pair<int, int>
     {
         auto Function = StaticFindObject<UFunction*>(nullptr, nullptr, FunctionFullNameNoType);
         if (!Function)
@@ -492,72 +710,120 @@ namespace RC::Unreal::UObjectGlobals
             Output::send<LogLevel::Error>(STR("RegisterHook failed: UFunction '{}' not found\n"), FunctionFullNameNoType);
             return {-1, -1};
         }
-        return RegisterHook(Function, PreCallback, PostCallback, CustomData);
+        return RegisterHook(Function, std::move(PreCallback), std::move(PostCallback), CustomData);
     }
 
-    auto UnregisterHook(class UFunction* Function, std::pair<int, int> Ids) -> void
+    static auto MakeOwnedHookCallback(UnrealScriptFunctionCallable Callback,
+                                      std::shared_ptr<void> CustomData) -> UnrealScriptFunctionCallable
     {
-        if (!Function)
+        if (!Callback)
         {
-            Output::send<LogLevel::Error>(STR("UnregisterHook failed: UFunction is nullptr\n"));
-            return;
+            return {};
         }
-        Output::send(STR("Unregistering hook\n"));
-        auto NativeFunction = Function->GetFunc();
-        if (NativeFunction &&
-            NativeFunction != UObject::ProcessInternalInternal.get_function_address() &&
-            Function->HasAnyFunctionFlags(EFunctionFlags::FUNC_Native))
-        {
-            Output::send(STR("Unregistering native hook ({}, {})\n"), Ids.first, Ids.second);
-            if (auto PreNativeId = GlobalHooksInternal::GenericHookIdToNativeHookId.find(Ids.first); PreNativeId != GlobalHooksInternal::GenericHookIdToNativeHookId.end())
-            {
-                Function->UnregisterHook(PreNativeId->second);
-                Output::send(STR("Native hook unregistered\n"));
-            }
-            if (auto PostNativeId = GlobalHooksInternal::GenericHookIdToNativeHookId.find(Ids.second); PostNativeId != GlobalHooksInternal::GenericHookIdToNativeHookId.end())
-            {
-                Function->UnregisterHook(PostNativeId->second);
-            }
-        }
-        else if (NativeFunction &&
-                 NativeFunction == UObject::ProcessInternalInternal.get_function_address() &&
-                 !Function->HasAnyFunctionFlags(EFunctionFlags::FUNC_Native))
-        {
-            {
-                std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-                if (auto CallbackDataIt = GlobalHooksInternal::GlobalScriptHooks.find(Function->GetFullName()); CallbackDataIt != GlobalHooksInternal::GlobalScriptHooks.end())
-                {
-                    auto& Callbacks = CallbackDataIt->second.Callables;
-                    Callbacks.erase(std::remove_if(Callbacks.begin(), Callbacks.end(), [&](GlobalHooksInternal::CallableData::InternalData& CallbackData) -> bool {
-                        return Ids.first == CallbackData.PreId && Ids.second == CallbackData.PostId;
-                    }), Callbacks.end());
-                    if (Callbacks.empty())
-                    {
-                        if (auto ShortNameIt = GlobalHooksInternal::HookedShortNames.find(CallbackDataIt->second.ShortName);
-                            ShortNameIt != GlobalHooksInternal::HookedShortNames.end() && --ShortNameIt->second == 0)
-                        {
-                            GlobalHooksInternal::HookedShortNames.erase(ShortNameIt);
-                        }
-                        GlobalHooksInternal::GlobalScriptHooks.erase(CallbackDataIt);
-                    }
-                }
-                GlobalHooksInternal::bAnyScriptHook.store(!GlobalHooksInternal::GlobalScriptHooks.empty(), std::memory_order_release);
-            }
-        }
-        else
-        {
-            std::string error_message{"Was unable to unregister a UFunction hook, information:\n"};
-            error_message.append(std::format("UFunction::Func: {}\n", std::bit_cast<void*>(NativeFunction)));
-            error_message.append(std::format("ProcessInternal: {}\n", UObject::ProcessInternalInternal.get_function_address()));
-            error_message.append(std::format("FUNC_Native: {}\n", static_cast<uint32_t>(Function->HasAnyFunctionFlags(EFunctionFlags::FUNC_Native))));
-            throw std::runtime_error{error_message};
-        }
+        return [Callback = std::move(Callback), CustomData = std::move(CustomData)](
+                   UnrealScriptFunctionCallableContext& Context,
+                   void*) {
+            Callback(Context, CustomData.get());
+        };
     }
 
-    auto UnregisterHook(const StringType& FunctionFullNameNoType, std::pair<int, int> Ids) -> void
+    auto RegisterHookOwned(UFunction* Function,
+                           UnrealScriptFunctionCallable PreCallback,
+                           UnrealScriptFunctionCallable PostCallback,
+                           std::shared_ptr<void> CustomData) -> std::pair<int, int>
+    {
+        auto OwnedPreCallback = MakeOwnedHookCallback(std::move(PreCallback), CustomData);
+        auto OwnedPostCallback = MakeOwnedHookCallback(std::move(PostCallback), std::move(CustomData));
+        return RegisterHook(Function, std::move(OwnedPreCallback), std::move(OwnedPostCallback), nullptr);
+    }
+
+    auto RegisterHookOwned(const StringType& FunctionFullNameNoType,
+                           UnrealScriptFunctionCallable PreCallback,
+                           UnrealScriptFunctionCallable PostCallback,
+                           std::shared_ptr<void> CustomData) -> std::pair<int, int>
     {
         auto Function = StaticFindObject<UFunction*>(nullptr, nullptr, FunctionFullNameNoType);
-        if (!Function) { throw std::runtime_error{std::format("Unable to find function: {}", to_string(FunctionFullNameNoType))}; }
-        UnregisterHook(Function, Ids);
+        if (!Function)
+        {
+            Output::send<LogLevel::Error>(STR("RegisterHookOwned failed: UFunction '{}' not found\n"), FunctionFullNameNoType);
+            return {-1, -1};
+        }
+        return RegisterHookOwned(
+            Function,
+            std::move(PreCallback),
+            std::move(PostCallback),
+            std::move(CustomData));
+    }
+
+    auto UnregisterHook(std::pair<int, int> Ids) -> bool
+    {
+        StringType ScriptFunctionName{};
+        bool IsScriptHook{};
+        {
+            std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+            auto ScriptHook = GlobalHooksInternal::GenericScriptHookIdToFunctionName.find(Ids.first);
+            if (ScriptHook == GlobalHooksInternal::GenericScriptHookIdToFunctionName.end())
+            {
+                ScriptHook = GlobalHooksInternal::GenericScriptHookIdToFunctionName.find(Ids.second);
+            }
+            if (ScriptHook != GlobalHooksInternal::GenericScriptHookIdToFunctionName.end())
+            {
+                ScriptFunctionName = ScriptHook->second;
+                IsScriptHook = true;
+            }
+        }
+
+        if (IsScriptHook)
+        {
+            return RemoveGlobalScriptHook(ScriptFunctionName, Ids);
+        }
+
+        GlobalHooksInternal::NativeCallbackData PreCallback{};
+        GlobalHooksInternal::NativeCallbackData PostCallback{};
+        bool HasPreCallback{};
+        bool HasPostCallback{};
+        {
+            std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+            if (auto PreIt = GlobalHooksInternal::GenericHookIdToNativeHook.find(Ids.first);
+                PreIt != GlobalHooksInternal::GenericHookIdToNativeHook.end())
+            {
+                PreCallback = PreIt->second;
+                HasPreCallback = true;
+                GlobalHooksInternal::GenericHookIdToNativeHook.erase(PreIt);
+            }
+            if (auto PostIt = GlobalHooksInternal::GenericHookIdToNativeHook.find(Ids.second);
+                PostIt != GlobalHooksInternal::GenericHookIdToNativeHook.end())
+            {
+                PostCallback = PostIt->second;
+                HasPostCallback = true;
+                GlobalHooksInternal::GenericHookIdToNativeHook.erase(PostIt);
+            }
+        }
+
+        if (HasPreCallback)
+        {
+            PreCallback.Function->UnregisterHook(PreCallback.NativeId);
+        }
+        if (HasPostCallback)
+        {
+            PostCallback.Function->UnregisterHook(PostCallback.NativeId);
+        }
+        return HasPreCallback || HasPostCallback;
+    }
+
+    auto UnregisterHook([[maybe_unused]] UFunction* Function, std::pair<int, int> Ids) -> void
+    {
+        if (!UnregisterHook(Ids))
+        {
+            Output::send<LogLevel::Warning>(
+                STR("UnregisterHook did not find callback IDs ({}, {})\n"),
+                Ids.first,
+                Ids.second);
+        }
+    }
+
+    auto UnregisterHook([[maybe_unused]] const StringType& FunctionFullNameNoType, std::pair<int, int> Ids) -> void
+    {
+        UnregisterHook(static_cast<UFunction*>(nullptr), Ids);
     }
 }
