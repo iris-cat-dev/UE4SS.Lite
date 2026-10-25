@@ -12,6 +12,7 @@
 #include <Unreal/ClassListener.hpp>
 #include <Unreal/UnrealInitializer.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
+#include <atomic>
 #include <chrono>
 #include <format>
 #include <excpt.h>
@@ -356,8 +357,12 @@ namespace RC::Unreal::UObjectGlobals
                       PostId(PostId) {}
             };
             std::vector<InternalData> Callables{};
+            uint64 ShortName{};
         };
         static inline std::unordered_map<StringType, CallableData> GlobalScriptHooks{};
+        // Count full-name entries, not callbacks; full names remain the authoritative keys.
+        static inline std::unordered_map<uint64, size_t> HookedShortNames{};
+        static inline std::atomic<bool> bAnyScriptHook{};
         static inline std::shared_mutex GlobalScriptHooksMutex{};
         static inline bool bIsHookEnabled{};
         static inline int32_t LastGenericHookId{};
@@ -366,14 +371,15 @@ namespace RC::Unreal::UObjectGlobals
 
     static auto GlobalScriptHookPre([[maybe_unused]]Hook::TCallbackIterationData<void>& CallbackIterationData, [[maybe_unused]]Unreal::UObject* Context, Unreal::FFrame& Stack, [[maybe_unused]]void* RESULT_DECL) -> void
     {
-        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-        if (GlobalHooksInternal::GlobalScriptHooks.empty()) { return; }
+        if (!GlobalHooksInternal::bAnyScriptHook.load(std::memory_order_acquire)) { return; }
         auto* Node = Stack.Node();
         if (!Node) { return; }
-        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(Node->GetFullName()); it != GlobalHooksInternal::GlobalScriptHooks.end())
+        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+        if (!GlobalHooksInternal::HookedShortNames.contains(Node->GetFName().ToUnstableInt())) { return; }
+        auto function_name = Node->GetFullName();
+        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(function_name); it != GlobalHooksInternal::GlobalScriptHooks.end())
         {
             UnrealScriptFunctionCallableContext CallableContext{Context, Stack, RESULT_DECL};
-            auto function_name = Node->GetFullName();
             for (const auto& Callable : it->second.Callables)
             {
                 invoke_global_script_callable(
@@ -390,14 +396,15 @@ namespace RC::Unreal::UObjectGlobals
 
     static auto GlobalScriptHookPost([[maybe_unused]]Hook::TCallbackIterationData<void>& CallbackIterationData, [[maybe_unused]]Unreal::UObject* Context, Unreal::FFrame& Stack, [[maybe_unused]]void* RESULT_DECL) -> void
     {
-        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-        if (GlobalHooksInternal::GlobalScriptHooks.empty()) { return; }
+        if (!GlobalHooksInternal::bAnyScriptHook.load(std::memory_order_acquire)) { return; }
         auto* Node = Stack.Node();
         if (!Node) { return; }
-        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(Node->GetFullName()); it != GlobalHooksInternal::GlobalScriptHooks.end())
+        std::shared_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
+        if (!GlobalHooksInternal::HookedShortNames.contains(Node->GetFName().ToUnstableInt())) { return; }
+        auto function_name = Node->GetFullName();
+        if (auto it = GlobalHooksInternal::GlobalScriptHooks.find(function_name); it != GlobalHooksInternal::GlobalScriptHooks.end())
         {
             UnrealScriptFunctionCallableContext CallableContext{Context, Stack, RESULT_DECL};
-            auto function_name = Node->GetFullName();
             for (const auto& Callable : it->second.Callables)
             {
                 invoke_global_script_callable(
@@ -456,8 +463,14 @@ namespace RC::Unreal::UObjectGlobals
             auto GenericPostId = GlobalHooksInternal::LastGenericHookId;
             {
                 std::unique_lock lock(GlobalHooksInternal::GlobalScriptHooksMutex);
-                auto [Data, _] = GlobalHooksInternal::GlobalScriptHooks.emplace(Function->GetFullName(), GlobalHooksInternal::CallableData{});
+                auto [Data, Inserted] = GlobalHooksInternal::GlobalScriptHooks.emplace(Function->GetFullName(), GlobalHooksInternal::CallableData{});
+                if (Inserted)
+                {
+                    Data->second.ShortName = Function->GetFName().ToUnstableInt();
+                    ++GlobalHooksInternal::HookedShortNames[Data->second.ShortName];
+                }
                 Data->second.Callables.emplace_back(PreCallback, PostCallback, CustomData, GenericPreId, GenericPostId);
+                GlobalHooksInternal::bAnyScriptHook.store(true, std::memory_order_release);
             }
             return {GenericPreId, GenericPostId};
         }
@@ -518,7 +531,17 @@ namespace RC::Unreal::UObjectGlobals
                     Callbacks.erase(std::remove_if(Callbacks.begin(), Callbacks.end(), [&](GlobalHooksInternal::CallableData::InternalData& CallbackData) -> bool {
                         return Ids.first == CallbackData.PreId && Ids.second == CallbackData.PostId;
                     }), Callbacks.end());
+                    if (Callbacks.empty())
+                    {
+                        if (auto ShortNameIt = GlobalHooksInternal::HookedShortNames.find(CallbackDataIt->second.ShortName);
+                            ShortNameIt != GlobalHooksInternal::HookedShortNames.end() && --ShortNameIt->second == 0)
+                        {
+                            GlobalHooksInternal::HookedShortNames.erase(ShortNameIt);
+                        }
+                        GlobalHooksInternal::GlobalScriptHooks.erase(CallbackDataIt);
+                    }
                 }
+                GlobalHooksInternal::bAnyScriptHook.store(!GlobalHooksInternal::GlobalScriptHooks.empty(), std::memory_order_release);
             }
         }
         else
