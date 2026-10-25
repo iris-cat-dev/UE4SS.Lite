@@ -104,6 +104,7 @@ UE4.10–4.27、UE5.0–5.7 是 `VersionedContainer/Container.cpp:40–188` 的�
 | W13 Proxy导出 | 对照生成def逐项比较名字/ordinal（含ordinalN别名），再对目标系统DLL检查跳板目的；LoadLibrary后立即调用无副作用导出；受控原DLL缺一个符号 | 无额外DllMain/mProcs导出；目标在attach返回前齐全；缺符号拒绝attach，无null jump；不是只比较count | unverified |
 | W14 Proxy路径/退出 | 默认、override后旁置与裸名fallback；空文件/空首行/CRLF/^Z/BOM/空白/引号；CRT UTF-8及ACP/OEM；相对、C:relative、异盘D:relative、根相对、UNC/verbatim；无效编码；worker创建失败；立即卸载/进程退出 | override用UE4SS.dll；fallback用UE4SSL.dll；不normalize/trim；无效编码新行为debug-log并跳过；核心异步就绪；缺失分支拒绝或弹错+ExitProcess(0)；worker引用保活；reserved退出不重复FreeLibrary | unverified |
 | W15 停机竞态 | callback等待可控事件，另一线程发stop；释放事件；loader-lock外ue4ssl_shutdown后FreeLibrary调用者引用；重复shutdown/进程退出；受控IAT线程取目标后暂停、shutdown/unhook后再进入 | Mod/VM/队列资源drain，不等于core卸载；**PIN core在shutdown/FreeLibrary后仍映射，至进程退出才释放**；迟到IAT调用original非null；inflight计数不单独证明可unmap；detach不join；actor/worker不是游戏线程 | unverified |
+| W16 Detour 跳板 | 执行 `ue4ssl-hook` Release 单测：RAX 跨 trampoline 恢复跳转存活；12 字节函数 A 后紧邻函数 B；搬移窗口含超过 rel32 距离的 CALL | 入口及恢复跳转不改写通用寄存器；短函数 Hook 安全拒绝且 A/B 字节与结果不变；远 CALL 返回到恢复 JMP 而非对齐或地址池 | 隔离原生回归通过；游戏未验证 |
 
 ## 每个公开 API 的参数/返回/错误回归方法
 

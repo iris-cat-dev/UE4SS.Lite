@@ -6,8 +6,8 @@ use std::ptr::{copy_nonoverlapping, null_mut};
 use std::slice;
 
 use patternsleuth::iced_x86::{
-    BlockEncoder, BlockEncoderOptions, Decoder, DecoderOptions, Instruction, InstructionBlock,
-    Mnemonic, OpKind,
+    BlockEncoder, BlockEncoderOptions, Code, Decoder, DecoderOptions, FlowControl, Instruction,
+    InstructionBlock, Mnemonic, OpKind,
 };
 
 type Bool = i32;
@@ -29,7 +29,7 @@ const IMAGE_NT_SIGNATURE: u32 = 0x0000_4550;
 const IMAGE_ORDINAL_FLAG64: u64 = 0x8000_0000_0000_0000;
 const MAX_INSTRUCTION_SCAN: usize = 96;
 const MAX_BRANCH_SCAN_DEPTH: usize = 16;
-const DETOUR_STUB_SIZE: usize = 12;
+const DETOUR_STUB_SIZE: usize = 14;
 
 #[link(name = "kernel32", kind = "raw-dylib")]
 extern "system" {
@@ -276,11 +276,11 @@ unsafe fn read_process_bytes(address: *const u8, len: usize) -> &'static [u8] {
 
 fn absolute_jump_bytes(destination: u64) -> [u8; DETOUR_STUB_SIZE] {
     let mut bytes = [0u8; DETOUR_STUB_SIZE];
-    bytes[0] = 0x48;
-    bytes[1] = 0xB8;
-    bytes[2..10].copy_from_slice(&destination.to_le_bytes());
-    bytes[10] = 0xFF;
-    bytes[11] = 0xE0;
+    // jmp qword ptr [rip + 0], followed by the destination literal.
+    // Unlike mov rax / jmp rax, this preserves every general-purpose register.
+    bytes[0] = 0xFF;
+    bytes[1] = 0x25;
+    bytes[6..14].copy_from_slice(&destination.to_le_bytes());
     bytes
 }
 
@@ -463,7 +463,19 @@ unsafe fn decode_overwritten_instructions(
         }
 
         total += instruction.len();
+        let ends_linear_flow = matches!(
+            instruction.flow_control(),
+            FlowControl::UnconditionalBranch
+                | FlowControl::IndirectBranch
+                | FlowControl::Return
+                | FlowControl::Interrupt
+                | FlowControl::Exception
+        );
         instructions.push(instruction);
+        if total < min_patch_size && ends_linear_flow {
+            // The patch would have to consume bytes after the function/thunk boundary.
+            return None;
+        }
     }
 
     Some((instructions, bytes[..total].to_vec(), total))
@@ -474,16 +486,19 @@ unsafe fn encode_trampoline(
     instructions: &[Instruction],
     resume_address: u64,
 ) -> Option<Vec<u8>> {
-    let result = BlockEncoder::encode(
+    let mut relocated = Vec::with_capacity(instructions.len() + 1);
+    relocated.extend_from_slice(instructions);
+    relocated.push(Instruction::with_branch(Code::Jmp_rel32_64, resume_address).ok()?);
+
+    // Encoding the resume jump with the relocated block keeps normal control flow
+    // ahead of any far-branch pointer pool emitted by BlockEncoder.
+    BlockEncoder::encode(
         64,
-        InstructionBlock::new(instructions, trampoline as u64),
+        InstructionBlock::new(&relocated, trampoline as u64),
         BlockEncoderOptions::NONE,
     )
-    .ok()?;
-
-    let mut buffer = result.code_buffer;
-    buffer.extend_from_slice(&absolute_jump_bytes(resume_address));
-    Some(buffer)
+    .ok()
+    .map(|result| result.code_buffer)
 }
 
 impl DetourHandle {
@@ -1191,23 +1206,144 @@ mod tests {
     }
 
     #[test]
-    fn absolute_jump_bytes_encode_mov_rax_jmp_rax() {
+    fn absolute_jump_bytes_encode_rip_indirect_jump() {
         let destination = 0x1122_3344_5566_7788u64;
         let bytes = absolute_jump_bytes(destination);
 
-        assert_eq!(bytes[0], 0x48);
-        assert_eq!(bytes[1], 0xB8);
+        assert_eq!(&bytes[..6], &[0xFF, 0x25, 0, 0, 0, 0]);
         assert_eq!(
-            u64::from_le_bytes(bytes[2..10].try_into().unwrap()),
+            u64::from_le_bytes(bytes[6..14].try_into().unwrap()),
             destination
         );
-        assert_eq!(bytes[10], 0xFF);
-        assert_eq!(bytes[11], 0xE0);
+    }
+
+    unsafe extern "system" fn detour_test_replacement(_: u64, _: u64) -> u64 {
+        99
+    }
+
+    #[test]
+    fn detour_trampoline_preserves_prologue_rax() {
+        unsafe {
+            let target = allocate_executable(128);
+            assert!(!target.is_null());
+            let mut code = [0x90u8; 96];
+            // mov rax, rcx; eleven NOPs; add rax, rdx; ret.
+            // RAX is live across the relocated prologue's resume jump.
+            code[..3].copy_from_slice(&[0x48, 0x89, 0xC8]);
+            code[14..18].copy_from_slice(&[0x48, 0x01, 0xD0, 0xC3]);
+            assert!(write_executable_memory(target, &code));
+            let invoke: unsafe extern "system" fn(u64, u64) -> u64 = std::mem::transmute(target);
+            assert_eq!(invoke(17, 25), 42);
+
+            let mut trampoline = 0;
+            let mut detour = DetourHandle::new(
+                target as u64,
+                detour_test_replacement as *const () as u64,
+                &mut trampoline,
+            )
+            .unwrap();
+            assert!(detour.hook());
+            let hooked = invoke(17, 25);
+            let original: unsafe extern "system" fn(u64, u64) -> u64 =
+                std::mem::transmute(trampoline);
+            let resumed = original(17, 25);
+            assert!(detour.unhook());
+            let restored = invoke(17, 25);
+            free_executable(target);
+
+            assert_eq!(hooked, 99);
+            assert_eq!(resumed, 42, "resume jump must preserve RAX");
+            assert_eq!(restored, 42);
+        }
+    }
+
+    #[test]
+    fn detour_rejects_patch_past_short_function_return() {
+        unsafe {
+            let target = allocate_executable(128);
+            assert!(!target.is_null());
+            let mut code = [0x90u8; 96];
+            // A: mov eax,42; six NOPs; ret (12 bytes).
+            code[..12]
+                .copy_from_slice(&[0xB8, 42, 0, 0, 0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xC3]);
+            // B immediately follows A: mov eax,7; ret.
+            code[12..18].copy_from_slice(&[0xB8, 7, 0, 0, 0, 0xC3]);
+            assert!(write_executable_memory(target, &code));
+            let function_a: unsafe extern "system" fn() -> u32 = std::mem::transmute(target);
+            let function_b: unsafe extern "system" fn() -> u32 =
+                std::mem::transmute(target.add(12));
+            assert_eq!(function_a(), 42);
+            assert_eq!(function_b(), 7);
+
+            let before = slice::from_raw_parts(target, 18).to_vec();
+            let mut trampoline = 0;
+            let mut detour = DetourHandle::new(
+                target as u64,
+                detour_test_replacement as *const () as u64,
+                &mut trampoline,
+            )
+            .unwrap();
+            assert!(!detour.hook());
+            assert_eq!(trampoline, 0);
+            assert_eq!(slice::from_raw_parts(target, 18), before);
+            assert_eq!(function_a(), 42);
+            assert_eq!(function_b(), 7);
+            free_executable(target);
+        }
+    }
+
+    #[test]
+    fn trampoline_far_call_returns_to_resume_jump_before_pointer_pool() {
+        let original_ip = 0x1000u64;
+        let call_target = 0x2000u64;
+        let mut bytes = [0x90u8; 14];
+        bytes[9] = 0xE8;
+        let displacement = call_target as i64 - (original_ip + 14) as i64;
+        bytes[10..14].copy_from_slice(&(displacement as i32).to_le_bytes());
+        let instructions: Vec<_> = Decoder::with_ip(64, &bytes, original_ip, DecoderOptions::NONE)
+            .into_iter()
+            .collect();
+
+        let trampoline_ip = 0x1_0000_0000u64;
+        let encoded = unsafe {
+            encode_trampoline(
+                trampoline_ip as usize as *mut u8,
+                &instructions,
+                original_ip + bytes.len() as u64,
+            )
+        }
+        .unwrap();
+        let mut decoder = Decoder::with_ip(64, &encoded, trampoline_ip, DecoderOptions::NONE);
+        for _ in 0..9 {
+            assert_eq!(decoder.decode().mnemonic(), Mnemonic::Nop);
+        }
+        let relocated_call = decoder.decode();
+        assert_eq!(relocated_call.mnemonic(), Mnemonic::Call);
+        let return_address = relocated_call.next_ip();
+        let resume_jump = decoder.decode();
+        assert_eq!(resume_jump.ip(), return_address);
+        assert_eq!(
+            resume_jump.mnemonic(),
+            Mnemonic::Jmp,
+            "a far call must return to the encoded resume jump, not alignment or pointer data"
+        );
+        assert!(resume_jump.is_ip_rel_memory_operand());
+        let resume_literal_offset = resume_jump
+            .ip_rel_memory_address()
+            .checked_sub(trampoline_ip)
+            .unwrap() as usize;
+        let encoded_resume_address = u64::from_le_bytes(
+            encoded[resume_literal_offset..resume_literal_offset + std::mem::size_of::<u64>()]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(encoded_resume_address, original_ip + bytes.len() as u64);
     }
 
     #[test]
     fn decode_overwritten_instructions_collects_full_patch_window() {
-        let bytes = [0x53u8, 0x48, 0x83, 0xEC, 0x20, 0xC3];
+        let mut bytes = [0xCCu8; MAX_INSTRUCTION_SCAN];
+        bytes[..6].copy_from_slice(&[0x53, 0x48, 0x83, 0xEC, 0x20, 0xC3]);
 
         let (instructions, original, patch_size) =
             unsafe { decode_overwritten_instructions(bytes.as_ptr(), 5) }.unwrap();

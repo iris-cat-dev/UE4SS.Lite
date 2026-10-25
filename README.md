@@ -7,6 +7,7 @@ UE4SS-Lite is a friendly, high-performance hook framework for integrating with U
 - Builds the core runtime DLL: `UE4SSL.dll`.
 - Builds script engine mods: `UE4SSL.JavaScript` and `UE4SSL.Lua`.
 - Provides `xtask` commands for build, package, install, proxy generation, and ABI header synchronization.
+- Native detours preserve general-purpose registers, reject patch windows that cross a terminal instruction, and encode the trampoline resume branch before any far-branch pointer pool.
 
 ## Requirements
 
